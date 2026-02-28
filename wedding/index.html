@@ -18,23 +18,25 @@
   }
 
   .slider {
-    display: flex;
-    width: 100vw;
-    height: 100vh;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    scroll-behavior: smooth;
-  }
+  display: flex;
+  flex-direction: column;     /* ⬅️ ВАЖНО */
+  width: 100vw;
+  height: 100vh;
+  overflow-y: auto;            /* ⬅️ вместо overflow-x */
+  scroll-snap-type: y mandatory; /* ⬅️ вместо x */
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
 
   .slide {
-    flex: 0 0 100vw;
-    height: 100vh;
-    scroll-snap-align: start;
-
-    display: flex;
-    justify-content: center;
-    align-items: center;
-  }
+  width: 100vw;
+  height: 100vh;
+  flex: 0 0 100vh;
+  scroll-snap-align: start;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
 
   .slide img,
   .slide svg {
