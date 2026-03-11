@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Приглашение — split slide</title>
+<title>Приглашение — split on first swipe</title>
 
 <style>
   :root {
     --anim-duration: 700ms;
-    --gap: 50vw; /* на сколько половинки уезжают */
+    --gap: 50vw; /* насколько уезжают створки */
   }
 
   html,body{
@@ -16,7 +16,6 @@
     margin:0;
   }
 
-  /* слайдер: вертикальный скролл с snap */
   .slider{
     display:flex;
     flex-direction:column;
@@ -37,11 +36,9 @@
     justify-content:center;
     align-items:center;
     position:relative;
-    background:transparent;
     overflow:hidden;
   }
 
-  /* универсальные изображения внутри слайдов (исправлена опечатка) */
   .slide img,
   .slide svg {
     max-width:100%;
@@ -50,28 +47,20 @@
     display:block;
   }
 
-  /* --- Специальный стиль для первого (split) слайда --- */
-  .split-slide {
-    /* оставляем нормальное поведение — внутри будет абсолютное позиционирование половинок */
-    position:relative;
-    background:#fff; /* по желанию */
-  }
+  .split-slide { position:relative; background:#fff; }
 
-  /* контейнеры для левой/правой половины */
   .split-side {
     position:absolute;
-    inset:0; /* top:0;right:0;bottom:0;left:0; */
+    inset:0;
     overflow:hidden;
     transition: transform var(--anim-duration) cubic-bezier(.22,.9,.2,1), filter var(--anim-duration);
     will-change: transform, filter;
-    pointer-events:none; /* чтобы не мешать скроллу */
+    pointer-events:none;
   }
 
-  /* клип-области: левая половина — правая усечена; правая — левая усечена */
   .split-left { clip-path: inset(0 50% 0 0); }
   .split-right{ clip-path: inset(0 0 0 50%); }
 
-  /* одна и та же картинка внутри обеих половин — позиционируем её так, чтобы половинки совпадали */
   .split-side .media {
     position:absolute;
     inset:0;
@@ -81,14 +70,12 @@
     display:block;
   }
 
-  /* начальное положение (неразъехавшиеся) */
   .split-slide .split-left,
   .split-slide .split-right {
     transform: translateX(0);
     filter: none;
   }
 
-  /* состояние — половинки уезжают в стороны */
   .split-slide.is-split .split-left {
     transform: translateX(calc(var(--gap) * -1));
     filter: drop-shadow(-12px 0 18px rgba(0,0,0,0.12));
@@ -98,7 +85,6 @@
     filter: drop-shadow(12px 0 18px rgba(0,0,0,0.12));
   }
 
-  /* текст/интерактивные элементы (если нужны) — показываем поверх после разделения */
   .split-overlay {
     position:absolute;
     inset:0;
@@ -108,11 +94,9 @@
     pointer-events:none;
   }
 
-  /* прячем скроллбар визуально (как у вас) */
   .slider::-webkit-scrollbar { display:none; }
   .slider { scrollbar-width:none; -ms-overflow-style:none; }
 
-  /* маленькая адаптация: на узких экранах уменьшим дистанцию */
   @media (max-width:900px){
     :root { --gap: 40vw; }
   }
@@ -122,11 +106,8 @@
 
 <div class="slider" id="slider">
 
-  <!-- Первый слайд — split -->
   <section class="slide split-slide" id="slide-0" aria-label="Обложка">
-    <!-- левая и правая половинки — внутри кладём то же изображение (SVG/PNG/JPG) -->
     <div class="split-side split-left" aria-hidden="true">
-      <!-- меняйте src на вашу "Обложка web.svg" -->
       <img class="media" src="Обложка web.svg" alt="">
     </div>
 
@@ -134,13 +115,9 @@
       <img class="media" src="Обложка web.svg" alt="">
     </div>
 
-    <!-- если вы хотите текст/кнопки поверх — добавьте сюда (pointer-events:auto для интерактива) -->
-    <div class="split-overlay" aria-hidden="true">
-      <!-- пусто или элементы -->
-    </div>
+    <div class="split-overlay" aria-hidden="true"></div>
   </section>
 
-  <!-- остальные слайды -->
   <section class="slide" aria-label="Центр">
     <img src="center.svg" alt="Макет">
   </section>
@@ -156,31 +133,128 @@
 </div>
 
 <script>
-  (function(){
-    const slide0 = document.getElementById('slide-0');
+(function(){
+  const slider = document.getElementById('slider');
+  const slide0 = document.getElementById('slide-0');
+  const ANIM_CLASS = 'is-split';
 
-    // IntersectionObserver — когда первая секция видна (порог 0.5), добавляем класс
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.target === slide0) {
-          if (entry.intersectionRatio >= 0.5) {
-            slide0.classList.add('is-split');
-          } else {
-            slide0.classList.remove('is-split');
-          }
-        }
-      });
-    }, {
-      root: document.getElementById('slider'),
-      threshold: [0, 0.25, 0.5, 0.75, 1]
-    });
+  let startY = null;
+  let animating = false;
+  let split = false;
 
-    io.observe(slide0);
+  // парсер CSS-переменной --anim-duration (возвращает ms)
+  function getAnimMs(){
+    const raw = getComputedStyle(document.documentElement).getPropertyValue('--anim-duration').trim();
+    if (!raw) return 700;
+    if (raw.endsWith('ms')) return parseFloat(raw);
+    if (raw.endsWith('s')) return parseFloat(raw) * 1000;
+    return parseFloat(raw) || 700;
+  }
 
-    // Небольшая UX-деталь: если пользователь кликает или свайпает внутри разделённого слайда,
-    // дать возможность вернуть его обратно — уже реализуется через IntersectionObserver.
-    // (Вам не нужно здесь добавлять задержки/таймеры — анимация CSS управляется классом.)
-  })();
+  const animMs = getAnimMs();
+  const swipeThreshold = 40; // px минимальный свайп чтобы триггернуть
+
+  function lockScroll(){
+    slider.style.overflowY = 'hidden';
+  }
+  function unlockScroll(){
+    slider.style.overflowY = 'auto';
+  }
+
+  function triggerSplit(){
+    if (animating) return;
+    animating = true;
+    lockScroll();
+    slide0.classList.add(ANIM_CLASS);
+    // закончить анимацию через animMs
+    setTimeout(() => {
+      animating = false;
+      split = true;
+      unlockScroll();
+    }, animMs + 20);
+  }
+
+  function triggerUnsplit(){
+    if (animating) return;
+    animating = true;
+    lockScroll();
+    slide0.classList.remove(ANIM_CLASS);
+    setTimeout(() => {
+      animating = false;
+      split = false;
+      unlockScroll();
+    }, animMs + 20);
+  }
+
+  // touch handlers (mobile)
+  slider.addEventListener('touchstart', (e) => {
+    // если тач начался внутри первого слайда и слайд0 виден в вьюпорте полностью по координатам
+    const touch = e.touches[0];
+    startY = touch ? touch.clientY : null;
+  }, {passive:true});
+
+  slider.addEventListener('touchmove', (e) => {
+    if (startY === null) return;
+    const touch = e.touches[0];
+    if (!touch) return;
+    const dy = touch.clientY - startY;
+
+    // свайп вверх (dy < 0) — попытка открыть
+    if (dy < -swipeThreshold && !split && !animating) {
+      // предотвращаем стандартную прокрутку, чтобы не "дернуло" во время анимации
+      e.preventDefault();
+      triggerSplit();
+      startY = null;
+      return;
+    }
+
+    // свайп вниз (dy > 0) — попытка закрыть (если уже открыт)
+    if (dy > swipeThreshold && split && !animating) {
+      e.preventDefault();
+      triggerUnsplit();
+      startY = null;
+      return;
+    }
+    // иначе — позволяем браузеру обрабатывать (пассивно)
+  }, {passive:false});
+
+  slider.addEventListener('touchend', () => {
+    startY = null;
+  }, {passive:true});
+
+  // wheel handler (desktop): если пользователь крутит колесом на первом слайде
+  slider.addEventListener('wheel', (e) => {
+    // проверяем, что начальное положение прокрутки находится на первом слайде (scrollTop близок к 0)
+    const atTop = slider.scrollTop < 5;
+    if (!atTop) return; // только если мы на первом элементе
+    if (animating) {
+      e.preventDefault();
+      return;
+    }
+
+    const dy = e.deltaY;
+    if (dy > 30 && !split) {
+      // колесо вниз -> содержимое уезжает вверх -> мы хотим распахнуть
+      e.preventDefault();
+      triggerSplit();
+    } else if (dy < -30 && split) {
+      // колесо вверх (прокрутка вниз по документу) -> закрыть
+      e.preventDefault();
+      triggerUnsplit();
+    }
+  }, {passive:false});
+
+  // опционально: если пользователь кликает по центру слайда — можно тоже открыть/закрыть
+  slide0.addEventListener('click', (e) => {
+    // не мешаем если уже анимируем
+    if (animating) return;
+    // при клике: если ещё не разъехано — распахнуть, иначе — закрыть
+    if (!split) triggerSplit();
+    else triggerUnsplit();
+  });
+
+  // Убираем IntersectionObserver — поведение теперь управляется прямыми действиями пользователя.
+})();
 </script>
 
 </body>
