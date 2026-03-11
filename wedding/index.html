@@ -1,96 +1,187 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <title>Приглашение</title>
-  <meta property="og:title" content="Мы женимся! 🎉">
-  <meta property="og:description" content="Приглашаем тебя на свадьбу! Подробности на странице.">
-  <meta property="og:image" content="https://andreich1310.github.io/preview.jpg">
-  <meta property="og:url" content="https://andreich1310.github.io/">
-  <meta property="og:type" content="website">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Приглашение — split slide</title>
 
-  <!--Для прозрачной поисковой строки  -->
-  <meta name="theme-color" content="#f5e9da">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-
-  <style>
-  html, body {
-    margin: 0;
-    padding: 0;
-    height: 100%;
-    overflow: hidden;
+<style>
+  :root {
+    --anim-duration: 700ms;
+    --gap: 50vw; /* на сколько половинки уезжают */
   }
 
-.slider{
-  display:flex;
-  flex-direction:column;
+  html,body{
+    height:100%;
+    margin:0;
+  }
 
-  width:100vw;
-  height:100dvh;
+  /* слайдер: вертикальный скролл с snap */
+  .slider{
+    display:flex;
+    flex-direction:column;
+    width:100vw;
+    height:100dvh;
+    overflow-y:auto;
+    scroll-snap-type:y mandatory;
+    scroll-behavior:smooth;
+    -webkit-overflow-scrolling:touch;
+  }
 
-  overflow-y:auto;
-  scroll-snap-type:y mandatory;
-  scroll-behavior:smooth;
+  .slide{
+    width:100vw;
+    height:100dvh;
+    flex:0 0 100dvh;
+    scroll-snap-align:start;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    position:relative;
+    background:transparent;
+    overflow:hidden;
+  }
 
-  -webkit-overflow-scrolling:touch;
-}
-
-.slide{
-  width:100vw;
-  height:100dvh;
-  flex:0 0 100dvh;
-  scroll-snap-align:start;
-
-  display:flex;
-  justify-content:center;
-  align-items:center;
-}
-
+  /* универсальные изображения внутри слайдов (исправлена опечатка) */
   .slide img,
-  .slide svg,{
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
+  .slide svg {
+    max-width:100%;
+    max-height:100%;
+    object-fit:contain;
+    display:block;
   }
 
-.slide object{
-  width:100%;
-  height:100%;
-  display:block;
-}
-    
-  /* скрыть скроллбар */
-  .slider::-webkit-scrollbar {
-    display: none;
+  /* --- Специальный стиль для первого (split) слайда --- */
+  .split-slide {
+    /* оставляем нормальное поведение — внутри будет абсолютное позиционирование половинок */
+    position:relative;
+    background:#fff; /* по желанию */
   }
-  .slider {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
+
+  /* контейнеры для левой/правой половины */
+  .split-side {
+    position:absolute;
+    inset:0; /* top:0;right:0;bottom:0;left:0; */
+    overflow:hidden;
+    transition: transform var(--anim-duration) cubic-bezier(.22,.9,.2,1), filter var(--anim-duration);
+    will-change: transform, filter;
+    pointer-events:none; /* чтобы не мешать скроллу */
+  }
+
+  /* клип-области: левая половина — правая усечена; правая — левая усечена */
+  .split-left { clip-path: inset(0 50% 0 0); }
+  .split-right{ clip-path: inset(0 0 0 50%); }
+
+  /* одна и та же картинка внутри обеих половин — позиционируем её так, чтобы половинки совпадали */
+  .split-side .media {
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block;
+  }
+
+  /* начальное положение (неразъехавшиеся) */
+  .split-slide .split-left,
+  .split-slide .split-right {
+    transform: translateX(0);
+    filter: none;
+  }
+
+  /* состояние — половинки уезжают в стороны */
+  .split-slide.is-split .split-left {
+    transform: translateX(calc(var(--gap) * -1));
+    filter: drop-shadow(-12px 0 18px rgba(0,0,0,0.12));
+  }
+  .split-slide.is-split .split-right {
+    transform: translateX(var(--gap));
+    filter: drop-shadow(12px 0 18px rgba(0,0,0,0.12));
+  }
+
+  /* текст/интерактивные элементы (если нужны) — показываем поверх после разделения */
+  .split-overlay {
+    position:absolute;
+    inset:0;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    pointer-events:none;
+  }
+
+  /* прячем скроллбар визуально (как у вас) */
+  .slider::-webkit-scrollbar { display:none; }
+  .slider { scrollbar-width:none; -ms-overflow-style:none; }
+
+  /* маленькая адаптация: на узких экранах уменьшим дистанцию */
+  @media (max-width:900px){
+    :root { --gap: 40vw; }
   }
 </style>
-  
 </head>
 <body>
-  <div class="slider">
-  <!--<h1>🚀 Все работает!</h1>-->
-  <!--<p>Мы женимся</p>-->
-     <div class="slide">
-   <img src="Обложка web.svg" alt="Макет">
-     </div>
 
-     <div class="slide">
-   <img src="center.svg" alt="Макет">
-     </div>
+<div class="slider" id="slider">
 
-     <div class="slide">
-   <img src="Левая web.svg" alt="Макет">
-     </div>
-  
-     <div class="slide">
-        <object data="Правая web.svg"  type="image/svg+xml"></object>
-     </div>
-       
-  </div>
+  <!-- Первый слайд — split -->
+  <section class="slide split-slide" id="slide-0" aria-label="Обложка">
+    <!-- левая и правая половинки — внутри кладём то же изображение (SVG/PNG/JPG) -->
+    <div class="split-side split-left" aria-hidden="true">
+      <!-- меняйте src на вашу "Обложка web.svg" -->
+      <img class="media" src="Обложка web.svg" alt="">
+    </div>
+
+    <div class="split-side split-right" aria-hidden="true">
+      <img class="media" src="Обложка web.svg" alt="">
+    </div>
+
+    <!-- если вы хотите текст/кнопки поверх — добавьте сюда (pointer-events:auto для интерактива) -->
+    <div class="split-overlay" aria-hidden="true">
+      <!-- пусто или элементы -->
+    </div>
+  </section>
+
+  <!-- остальные слайды -->
+  <section class="slide" aria-label="Центр">
+    <img src="center.svg" alt="Макет">
+  </section>
+
+  <section class="slide" aria-label="Левая">
+    <img src="Левая web.svg" alt="Макет">
+  </section>
+
+  <section class="slide" aria-label="Правая">
+    <object data="Правая web.svg" type="image/svg+xml" style="width:100%;height:100%;display:block;"></object>
+  </section>
+
+</div>
+
+<script>
+  (function(){
+    const slide0 = document.getElementById('slide-0');
+
+    // IntersectionObserver — когда первая секция видна (порог 0.5), добавляем класс
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.target === slide0) {
+          if (entry.intersectionRatio >= 0.5) {
+            slide0.classList.add('is-split');
+          } else {
+            slide0.classList.remove('is-split');
+          }
+        }
+      });
+    }, {
+      root: document.getElementById('slider'),
+      threshold: [0, 0.25, 0.5, 0.75, 1]
+    });
+
+    io.observe(slide0);
+
+    // Небольшая UX-деталь: если пользователь кликает или свайпает внутри разделённого слайда,
+    // дать возможность вернуть его обратно — уже реализуется через IntersectionObserver.
+    // (Вам не нужно здесь добавлять задержки/таймеры — анимация CSS управляется классом.)
+  })();
+</script>
+
 </body>
 </html>
