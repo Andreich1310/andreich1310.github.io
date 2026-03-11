@@ -1,261 +1,214 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Приглашение — split on first swipe</title>
+  <meta charset="UTF-8">
+  <title>Приглашение</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f5e9da">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
 
-<style>
-  :root {
-    --anim-duration: 700ms;
-    --gap: 50vw; /* насколько уезжают створки */
-  }
+  <style>
+    /* базовая разметка страницы */
+    html,body{
+      margin:0;
+      padding:0;
+      height:100%;
+      background: #fff;
+      -webkit-font-smoothing:antialiased;
+    }
 
-  html,body{
-    height:100%;
-    margin:0;
-  }
+    /* главный вертикальный слайдер */
+    .slider{
+      width:100vw;
+      height:100dvh; /* real viewport height */
+      overflow-y:auto;
+      scroll-snap-type:y mandatory;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .slider::-webkit-scrollbar{ display:none; }
 
-  .slider{
-    display:flex;
-    flex-direction:column;
-    width:100vw;
-    height:100dvh;
-    overflow-y:auto;
-    scroll-snap-type:y mandatory;
-    scroll-behavior:smooth;
-    -webkit-overflow-scrolling:touch;
-  }
+    /* каждый слайд занимает весь экран */
+    .slide{
+      position:relative;
+      width:100vw;
+      height:100dvh;
+      flex:0 0 100dvh;
+      scroll-snap-align:start;
 
-  .slide{
-    width:100vw;
-    height:100dvh;
-    flex:0 0 100dvh;
-    scroll-snap-align:start;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    position:relative;
-    overflow:hidden;
-  }
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      overflow:hidden;
+    }
 
-  .slide img,
-  .slide svg {
-    max-width:100%;
-    max-height:100%;
-    object-fit:contain;
-    display:block;
-  }
+    /* СЛАЙД 1 — специальный: содержит две створки (half) */
+    .slide.cover { background: transparent; }
 
-  .split-slide { position:relative; background:#fff; }
+    /* Половинки (дверцы) — занимают по 50% экрана, поверх всего */
+    .cover .half{
+      position:absolute;
+      top:0;
+      height:100%;
+      width:50%;
+      overflow:hidden;
+      z-index: 30; /* над всем */
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      backface-visibility:hidden;
+      -webkit-backface-visibility:hidden;
+      will-change: transform;
+      transition: transform 600ms cubic-bezier(.22,.9,.29,1);
+      background: white; /* при необходимости */
+    }
 
-  .split-side {
-    position:absolute;
-    inset:0;
-    overflow:hidden;
-    transition: transform var(--anim-duration) cubic-bezier(.22,.9,.2,1), filter var(--anim-duration);
-    will-change: transform, filter;
-    pointer-events:none;
-  }
+    .cover .half.left{ left:0; transform-origin: left center; }
+    .cover .half.right{ right:0; transform-origin: right center; }
 
-  .split-left { clip-path: inset(0 50% 0 0); }
-  .split-right{ clip-path: inset(0 0 0 50%); }
+    /* Внутри половинки может быть img или svg (object) */
+    .cover .half img,
+    .cover .half object{
+      width:100%;
+      height:100%;
+      display:block;
+      object-fit:cover; /* изображение заполняет половинку */
+    }
 
-  .split-side .media {
-    position:absolute;
-    inset:0;
-    width:100%;
-    height:100%;
-    object-fit:cover;
-    display:block;
-  }
+    /* Скрытый слайд (тот, что "за половинками") — он обычный второй слайд,
+       но при начальном рендере его видимость закрыта созданными дверцами. */
+    .slide.revealed{
+      z-index: 10; /* под створками */
+      background: transparent;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
 
-  .split-slide .split-left,
-  .split-slide .split-right {
-    transform: translateX(0);
-    filter: none;
-  }
+    /* после открытия — передвинем створки в стороны */
+    .cover.open .half.left{
+      transform: translateX(-105%); /* уводим влево */
+    }
+    .cover.open .half.right{
+      transform: translateX(105%);  /* уводим вправо */
+    }
 
-  .split-slide.is-split .split-left {
-    transform: translateX(calc(var(--gap) * -1));
-    filter: drop-shadow(-12px 0 18px rgba(0,0,0,0.12));
-  }
-  .split-slide.is-split .split-right {
-    transform: translateX(var(--gap));
-    filter: drop-shadow(12px 0 18px rgba(0,0,0,0.12));
-  }
+    /* общий стиль для объекта svg внутри слайда (для ссылок внутри) */
+    .slide.revealed object,
+    .slide.revealed img{
+      width:100%;
+      height:100%;
+      display:block;
+      object-fit:contain;
+    }
 
-  .split-overlay {
-    position:absolute;
-    inset:0;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    pointer-events:none;
-  }
-
-  .slider::-webkit-scrollbar { display:none; }
-  .slider { scrollbar-width:none; -ms-overflow-style:none; }
-
-  @media (max-width:900px){
-    :root { --gap: 40vw; }
-  }
-</style>
+    /* чуть-чуть не даём «резинного» эффекта прокрутки */
+    body{ overscroll-behavior: contain; }
+  </style>
 </head>
 <body>
+  <div class="slider" id="slider">
 
-<div class="slider" id="slider">
+    <!-- СЛАЙД 1: створки (правая/левая) — помещаем SVG как фон половинок -->
+    <section class="slide cover" id="coverSlide">
+      <div class="half left">
+        <!-- можно вставить svg как img (здесь у тебя 'Левая.svg') -->
+        <img src="Левая.svg" alt="левая створка">
+      </div>
 
-  <section class="slide split-slide" id="slide-0" aria-label="Обложка">
-    <div class="split-side split-left" aria-hidden="true">
-      <img class="media" src="Обложка web.svg" alt="">
-    </div>
+      <div class="half right">
+        <!-- правая створка -->
+        <img src="center.svg" alt="правая створка"> <!-- или другой файл -->
+      </div>
 
-    <div class="split-side split-right" aria-hidden="true">
-      <img class="media" src="Обложка web.svg" alt="">
-    </div>
+      <!-- Можно оставить в середине логотип/текст -->
+      <!-- <div class="center-content">...</div> -->
+    </section>
 
-    <div class="split-overlay" aria-hidden="true"></div>
-  </section>
+    <!-- СЛАЙД 2: тот, что должен быть "за половинками".
+         используем <object> чтобы внутри SVG ссылки работали -->
+    <section class="slide revealed" id="hiddenSlide">
+      <object data="Правая web.svg" type="image/svg+xml"></object>
+    </section>
 
-  <section class="slide" aria-label="Центр">
-    <img src="center.svg" alt="Макет">
-  </section>
+    <!-- Остальные слайды -->
+    <section class="slide">
+      <img src="center.svg" alt="Макет">
+    </section>
 
-  <section class="slide" aria-label="Левая">
-    <img src="Левая web.svg" alt="Макет">
-  </section>
+    <section class="slide">
+      <img src="Левая.svg" alt="Макет">
+    </section>
 
-  <section class="slide" aria-label="Правая">
-    <object data="Правая web.svg" type="image/svg+xml" style="width:100%;height:100%;display:block;"></object>
-  </section>
+  </div>
 
-</div>
+  <script>
+    (function(){
+      const slider = document.getElementById('slider');
+      const cover = document.getElementById('coverSlide');
+      const hidden = document.getElementById('hiddenSlide');
+      let opened = false;
+      let touchStartY = null;
+      let touchMoved = false;
 
-<script>
-(function(){
-  const slider = document.getElementById('slider');
-  const slide0 = document.getElementById('slide-0');
-  const ANIM_CLASS = 'is-split';
+      // Функция открытия створок
+      function openCoverAndReveal() {
+        if(opened) return;
+        opened = true;
+        cover.classList.add('open');
 
-  let startY = null;
-  let animating = false;
-  let split = false;
+        // После короткой задержки — пролистываем к скрытому слайду,
+        // чтобы пользователь оказался уже на нём (если он свайпал вверх).
+        setTimeout(()=> {
+          // плавно прокрутить до второго слайда
+          hidden.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 350); // совпадает с частью анимации
+      }
 
-  // парсер CSS-переменной --anim-duration (возвращает ms)
-  function getAnimMs(){
-    const raw = getComputedStyle(document.documentElement).getPropertyValue('--anim-duration').trim();
-    if (!raw) return 700;
-    if (raw.endsWith('ms')) return parseFloat(raw);
-    if (raw.endsWith('s')) return parseFloat(raw) * 1000;
-    return parseFloat(raw) || 700;
-  }
+      // Обработка колеса мыши (для десктопа)
+      window.addEventListener('wheel', function(e){
+        if(opened) return;
+        // если скроллим вниз (вперед)
+        if(e.deltaY > 30){
+          e.preventDefault?.();
+          openCoverAndReveal();
+        }
+      }, { passive: false });
 
-  const animMs = getAnimMs();
-  const swipeThreshold = 40; // px минимальный свайп чтобы триггернуть
+      // Обработка тачей (мобильное устройство) — определим свайп вверх
+      slider.addEventListener('touchstart', function(e){
+        touchStartY = e.touches[0].clientY;
+        touchMoved = false;
+      }, { passive: true });
 
-  function lockScroll(){
-    slider.style.overflowY = 'hidden';
-  }
-  function unlockScroll(){
-    slider.style.overflowY = 'auto';
-  }
+      slider.addEventListener('touchmove', function(e){
+        touchMoved = true;
+      }, { passive: true });
 
-  function triggerSplit(){
-    if (animating) return;
-    animating = true;
-    lockScroll();
-    slide0.classList.add(ANIM_CLASS);
-    // закончить анимацию через animMs
-    setTimeout(() => {
-      animating = false;
-      split = true;
-      unlockScroll();
-    }, animMs + 20);
-  }
+      slider.addEventListener('touchend', function(e){
+        if(opened) return;
+        if(!touchMoved || touchStartY === null) return;
+        const touchEndY = (e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0].clientY : null;
+        if(touchEndY === null) return;
+        const dy = touchEndY - touchStartY;
+        // dy < 0 => свайп вверх. Порог 30px
+        if(dy < -30){
+          openCoverAndReveal();
+        }
+        touchStartY = null;
+        touchMoved = false;
+      }, { passive: true });
 
-  function triggerUnsplit(){
-    if (animating) return;
-    animating = true;
-    lockScroll();
-    slide0.classList.remove(ANIM_CLASS);
-    setTimeout(() => {
-      animating = false;
-      split = false;
-      unlockScroll();
-    }, animMs + 20);
-  }
+      // Альтернативно: можно открыть по клику/тапу на створке:
+      cover.addEventListener('click', function(e){
+        if(!opened) openCoverAndReveal();
+      });
 
-  // touch handlers (mobile)
-  slider.addEventListener('touchstart', (e) => {
-    // если тач начался внутри первого слайда и слайд0 виден в вьюпорте полностью по координатам
-    const touch = e.touches[0];
-    startY = touch ? touch.clientY : null;
-  }, {passive:true});
+      // Защитный прием: если JS не сработал, при скролле вниз пользователь просто увидит второй слайд,
+      // потому что створки физически выше (z-index), поэтому ничего ломать не будет.
 
-  slider.addEventListener('touchmove', (e) => {
-    if (startY === null) return;
-    const touch = e.touches[0];
-    if (!touch) return;
-    const dy = touch.clientY - startY;
-
-    // свайп вверх (dy < 0) — попытка открыть
-    if (dy < -swipeThreshold && !split && !animating) {
-      // предотвращаем стандартную прокрутку, чтобы не "дернуло" во время анимации
-      e.preventDefault();
-      triggerSplit();
-      startY = null;
-      return;
-    }
-
-    // свайп вниз (dy > 0) — попытка закрыть (если уже открыт)
-    if (dy > swipeThreshold && split && !animating) {
-      e.preventDefault();
-      triggerUnsplit();
-      startY = null;
-      return;
-    }
-    // иначе — позволяем браузеру обрабатывать (пассивно)
-  }, {passive:false});
-
-  slider.addEventListener('touchend', () => {
-    startY = null;
-  }, {passive:true});
-
-  // wheel handler (desktop): если пользователь крутит колесом на первом слайде
-  slider.addEventListener('wheel', (e) => {
-    // проверяем, что начальное положение прокрутки находится на первом слайде (scrollTop близок к 0)
-    const atTop = slider.scrollTop < 5;
-    if (!atTop) return; // только если мы на первом элементе
-    if (animating) {
-      e.preventDefault();
-      return;
-    }
-
-    const dy = e.deltaY;
-    if (dy > 30 && !split) {
-      // колесо вниз -> содержимое уезжает вверх -> мы хотим распахнуть
-      e.preventDefault();
-      triggerSplit();
-    } else if (dy < -30 && split) {
-      // колесо вверх (прокрутка вниз по документу) -> закрыть
-      e.preventDefault();
-      triggerUnsplit();
-    }
-  }, {passive:false});
-
-  // опционально: если пользователь кликает по центру слайда — можно тоже открыть/закрыть
-  slide0.addEventListener('click', (e) => {
-    // не мешаем если уже анимируем
-    if (animating) return;
-    // при клике: если ещё не разъехано — распахнуть, иначе — закрыть
-    if (!split) triggerSplit();
-    else triggerUnsplit();
-  });
-
-  // Убираем IntersectionObserver — поведение теперь управляется прямыми действиями пользователя.
-})();
-</script>
-
+    })();
+  </script>
 </body>
 </html>
