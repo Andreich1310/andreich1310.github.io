@@ -108,40 +108,37 @@
   </style>
 </head>
 <body>
-  <div class="slider" id="slider">
+<div class="slider" id="slider">
 
-    <!-- СЛАЙД 1: створки (правая/левая) — помещаем SVG как фон половинок -->
-    <section class="slide cover" id="coverSlide">
-      <div class="half left">
-        <!-- можно вставить svg как img (здесь у тебя 'Левая.svg') -->
-        <img src="Левая.svg" alt="левая створка">
-      </div>
+  <!-- Первый слайд — половинки должны быть ОБЛОЖКОЙ -->
+  <section class="slide split-slide" id="slide-0" aria-label="Обложка">
+    <div class="split-side split-left" aria-hidden="true">
+      <!-- строго та же обложка в обеих половинках -->
+      <img class="media" src="Обложка web.svg" alt="">
+      <!-- или, если пробелы мешают: src="Обложка%20web.svg" -->
+    </div>
 
-      <div class="half right">
-        <!-- правая створка -->
-        <img src="center.svg" alt="правая створка"> <!-- или другой файл -->
-      </div>
+    <div class="split-side split-right" aria-hidden="true">
+      <img class="media" src="Обложка web.svg" alt="">
+    </div>
 
-      <!-- Можно оставить в середине логотип/текст -->
-      <!-- <div class="center-content">...</div> -->
-    </section>
+    <div class="split-overlay" aria-hidden="true"></div>
+  </section>
 
-    <!-- СЛАЙД 2: тот, что должен быть "за половинками".
-         используем <object> чтобы внутри SVG ссылки работали -->
-    <section class="slide revealed" id="hiddenSlide">
-      <object data="Правая web.svg" type="image/svg+xml"></object>
-    </section>
+  <!-- Остальные слайды идут после -->
+  <section class="slide" aria-label="Центр">
+    <img src="center.svg" alt="Центр">
+  </section>
 
-    <!-- Остальные слайды -->
-    <section class="slide">
-      <img src="center.svg" alt="Макет">
-    </section>
+  <section class="slide" aria-label="Левая">
+    <img src="Левая web.svg" alt="Левая">
+  </section>
 
-    <section class="slide">
-      <img src="Левая.svg" alt="Макет">
-    </section>
+  <section class="slide" aria-label="Правая">
+    <object data="Правая web.svg" type="image/svg+xml" style="width:100%;height:100%;display:block;"></object>
+  </section>
 
-  </div>
+</div>
 
   <script>
     (function(){
