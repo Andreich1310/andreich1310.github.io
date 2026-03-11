@@ -1,211 +1,169 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <title>Приглашение</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#f5e9da">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Приглашение</title>
 
-  <style>
-    /* базовая разметка страницы */
-    html,body{
-      margin:0;
-      padding:0;
-      height:100%;
-      background: #fff;
-      -webkit-font-smoothing:antialiased;
-    }
+<style>
 
-    /* главный вертикальный слайдер */
-    .slider{
-      width:100vw;
-      height:100dvh; /* real viewport height */
-      overflow-y:auto;
-      scroll-snap-type:y mandatory;
-      -webkit-overflow-scrolling: touch;
-      scrollbar-width: none;
-    }
-    .slider::-webkit-scrollbar{ display:none; }
+html,body{
+margin:0;
+height:100%;
+overflow:hidden;
+}
 
-    /* каждый слайд занимает весь экран */
-    .slide{
-      position:relative;
-      width:100vw;
-      height:100dvh;
-      flex:0 0 100dvh;
-      scroll-snap-align:start;
+/* ===== HERO (двери) ===== */
 
-      display:flex;
-      justify-content:center;
-      align-items:center;
-      overflow:hidden;
-    }
+.hero{
+position:fixed;
+inset:0;
+z-index:10;
+overflow:hidden;
+pointer-events:none;
+}
 
-    /* СЛАЙД 1 — специальный: содержит две створки (half) */
-    .slide.cover { background: transparent; }
+.door{
+position:absolute;
+inset:0;
+transition:transform .8s cubic-bezier(.22,.9,.2,1);
+}
 
-    /* Половинки (дверцы) — занимают по 50% экрана, поверх всего */
-    .cover .half{
-      position:absolute;
-      top:0;
-      height:100%;
-      width:50%;
-      overflow:hidden;
-      z-index: 30; /* над всем */
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      backface-visibility:hidden;
-      -webkit-backface-visibility:hidden;
-      will-change: transform;
-      transition: transform 600ms cubic-bezier(.22,.9,.29,1);
-      background: white; /* при необходимости */
-    }
+.left{
+clip-path: inset(0 50% 0 0);
+}
 
-    .cover .half.left{ left:0; transform-origin: left center; }
-    .cover .half.right{ right:0; transform-origin: right center; }
+.right{
+clip-path: inset(0 0 0 50%);
+}
 
-    /* Внутри половинки может быть img или svg (object) */
-    .cover .half img,
-    .cover .half object{
-      width:100%;
-      height:100%;
-      display:block;
-      object-fit:cover; /* изображение заполняет половинку */
-    }
+.door img{
+position:absolute;
+inset:0;
+width:100%;
+height:100%;
+object-fit:cover;
+}
 
-    /* Скрытый слайд (тот, что "за половинками") — он обычный второй слайд,
-       но при начальном рендере его видимость закрыта созданными дверцами. */
-    .slide.revealed{
-      z-index: 10; /* под створками */
-      background: transparent;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-    }
+/* открытие */
 
-    /* после открытия — передвинем створки в стороны */
-    .cover.open .half.left{
-      transform: translateX(-105%); /* уводим влево */
-    }
-    .cover.open .half.right{
-      transform: translateX(105%);  /* уводим вправо */
-    }
+.hero.open .left{
+transform:translateX(-50vw);
+}
 
-    /* общий стиль для объекта svg внутри слайда (для ссылок внутри) */
-    .slide.revealed object,
-    .slide.revealed img{
-      width:100%;
-      height:100%;
-      display:block;
-      object-fit:contain;
-    }
+.hero.open .right{
+transform:translateX(50vw);
+}
 
-    /* чуть-чуть не даём «резинного» эффекта прокрутки */
-    body{ overscroll-behavior: contain; }
-  </style>
+/* ===== SLIDER ===== */
+
+.slider{
+height:100dvh;
+overflow-y:auto;
+scroll-snap-type:y mandatory;
+}
+
+.slide{
+height:100dvh;
+scroll-snap-align:start;
+display:flex;
+justify-content:center;
+align-items:center;
+}
+
+.slide img{
+max-width:100%;
+max-height:100%;
+object-fit:contain;
+}
+
+</style>
 </head>
+
 <body>
-<div class="slider" id="slider">
 
-  <!-- Первый слайд — половинки должны быть ОБЛОЖКОЙ -->
-  <section class="slide split-slide" id="slide-0" aria-label="Обложка">
-    <div class="split-side split-left" aria-hidden="true">
-      <!-- строго та же обложка в обеих половинках -->
-      <img class="media" src="Обложка web.svg" alt="">
-      <!-- или, если пробелы мешают: src="Обложка%20web.svg" -->
-    </div>
+<!-- двери -->
+<div class="hero" id="hero">
 
-    <div class="split-side split-right" aria-hidden="true">
-      <img class="media" src="Обложка web.svg" alt="">
-    </div>
+<div class="door left">
+<img src="Обложка web.svg">
+</div>
 
-    <div class="split-overlay" aria-hidden="true"></div>
-  </section>
-
-  <!-- Остальные слайды идут после -->
-  <section class="slide" aria-label="Центр">
-    <img src="center.svg" alt="Центр">
-  </section>
-
-  <section class="slide" aria-label="Левая">
-    <img src="Левая web.svg" alt="Левая">
-  </section>
-
-  <section class="slide" aria-label="Правая">
-    <object data="Правая web.svg" type="image/svg+xml" style="width:100%;height:100%;display:block;"></object>
-  </section>
+<div class="door right">
+<img src="Обложка web.svg">
+</div>
 
 </div>
 
-  <script>
-    (function(){
-      const slider = document.getElementById('slider');
-      const cover = document.getElementById('coverSlide');
-      const hidden = document.getElementById('hiddenSlide');
-      let opened = false;
-      let touchStartY = null;
-      let touchMoved = false;
+<!-- основной контент -->
+<div class="slider" id="slider">
 
-      // Функция открытия створок
-      function openCoverAndReveal() {
-        if(opened) return;
-        opened = true;
-        cover.classList.add('open');
+<div class="slide">
+<img src="center.svg">
+</div>
 
-        // После короткой задержки — пролистываем к скрытому слайду,
-        // чтобы пользователь оказался уже на нём (если он свайпал вверх).
-        setTimeout(()=> {
-          // плавно прокрутить до второго слайда
-          hidden.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 350); // совпадает с частью анимации
-      }
+<div class="slide">
+<img src="Левая web.svg">
+</div>
 
-      // Обработка колеса мыши (для десктопа)
-      window.addEventListener('wheel', function(e){
-        if(opened) return;
-        // если скроллим вниз (вперед)
-        if(e.deltaY > 30){
-          e.preventDefault?.();
-          openCoverAndReveal();
-        }
-      }, { passive: false });
+<div class="slide">
+<object data="Правая web.svg" type="image/svg+xml"></object>
+</div>
 
-      // Обработка тачей (мобильное устройство) — определим свайп вверх
-      slider.addEventListener('touchstart', function(e){
-        touchStartY = e.touches[0].clientY;
-        touchMoved = false;
-      }, { passive: true });
+</div>
 
-      slider.addEventListener('touchmove', function(e){
-        touchMoved = true;
-      }, { passive: true });
 
-      slider.addEventListener('touchend', function(e){
-        if(opened) return;
-        if(!touchMoved || touchStartY === null) return;
-        const touchEndY = (e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0].clientY : null;
-        if(touchEndY === null) return;
-        const dy = touchEndY - touchStartY;
-        // dy < 0 => свайп вверх. Порог 30px
-        if(dy < -30){
-          openCoverAndReveal();
-        }
-        touchStartY = null;
-        touchMoved = false;
-      }, { passive: true });
+<script>
 
-      // Альтернативно: можно открыть по клику/тапу на створке:
-      cover.addEventListener('click', function(e){
-        if(!opened) openCoverAndReveal();
-      });
+const hero = document.getElementById("hero")
+const slider = document.getElementById("slider")
 
-      // Защитный прием: если JS не сработал, при скролле вниз пользователь просто увидит второй слайд,
-      // потому что створки физически выше (z-index), поэтому ничего ломать не будет.
+let startY = null
+let opened = false
 
-    })();
-  </script>
+window.addEventListener("touchstart",e=>{
+startY = e.touches[0].clientY
+},{passive:true})
+
+window.addEventListener("touchmove",e=>{
+
+if(opened) return
+
+let dy = e.touches[0].clientY - startY
+
+if(dy < -40){
+openDoors()
+}
+
+},{passive:true})
+
+
+window.addEventListener("wheel",e=>{
+
+if(opened) return
+
+if(e.deltaY > 30){
+openDoors()
+}
+
+},{passive:true})
+
+
+function openDoors(){
+
+opened = true
+
+hero.classList.add("open")
+
+document.body.style.overflow="auto"
+
+setTimeout(()=>{
+hero.style.display="none"
+},900)
+
+}
+
+</script>
+
 </body>
 </html>
