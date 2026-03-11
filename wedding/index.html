@@ -3,12 +3,17 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Приглашение — двери зависят от свайпа</title>
+<title>Приглашение — зазор и тень</title>
 <style>
   :root{
-    --max-gap-vw: 50vw; /* на сколько уезжают створки при прогрессе 1 */
+    --initial-gap-vw: 2;   /* видимый зазор в закрытом состоянии */
+    --max-gap-vw: 50;      /* максимальный сдвиг при progress=1 */
+    --hint-color: rgba(0,0,0,0.55);
+    --edge-shadow-w: 8px;  /* ширина внутренней тени у краёв створок */
   }
-  html,body{height:100%;margin:0;background:#fff;}
+
+  html,body{height:100%;margin:0;background:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;}
+
   /* HERO — поверх всего, ловит жесты */
   .hero{
     position:fixed;
@@ -16,7 +21,7 @@
     z-index:50;
     overflow:hidden;
     pointer-events:auto;
-    touch-action:none; /* полностью управляем жестами в JS */
+    touch-action:none;
     background:transparent;
     display:flex;
   }
@@ -27,6 +32,7 @@
     height:100%;
     overflow:hidden;
     display:block;
+    background:#fff;
   }
 
   .door img{
@@ -41,22 +47,74 @@
     pointer-events:none;
   }
 
-  /* левый и правый контейнер — transform управляется JS (translateX) */
-  .left  { justify-content:flex-end; }
-  .right { justify-content:flex-start; }
+  /* внутренняя тень у краёв дверей, чтобы показать "стык" */
+  .door .inner-edge{
+    position:absolute;
+    top:0;
+    bottom:0;
+    width:var(--edge-shadow-w);
+    pointer-events:none;
+    z-index:60;
+  }
+  .left .inner-edge{ right:0; background: linear-gradient(to left, rgba(0,0,0,0.16), rgba(0,0,0,0)); }
+  .right .inner-edge{ left:0;  background: linear-gradient(to right, rgba(0,0,0,0.16), rgba(0,0,0,0)); }
 
-  /* Тень по центру — чтобы выглядело как "дверь" */
+  /* Центр: тонкая полоска — сам зазор. Покажем её заметнее */
   .spine {
     position:absolute;
     left:50%;
     top:0;
     bottom:0;
-    width:4px;
-    transform: translateX(-50%);
+    width:6px;
+    transform:translateX(-50%);
     pointer-events:none;
-    background: linear-gradient(90deg, rgba(0,0,0,0.05), rgba(0,0,0,0.0));
-    z-index:60;
+    z-index:65;
+    border-radius:3px;
+    background: linear-gradient(90deg, rgba(0,0,0,0.14), rgba(255,255,255,0.02), rgba(0,0,0,0.18));
+    box-shadow: 0 0 18px rgba(0,0,0,0.06);
+    transition: opacity .18s linear;
+  }
+
+  /* Хинт: стрелка + текст */
+  .hint {
+    position: absolute;
+    left:50%;
+    bottom:12vh;
+    transform:translateX(-50%);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:8px;
+    z-index:70;
+    pointer-events:none;
+    color:var(--hint-color);
     opacity:1;
+    transition:opacity .25s linear, transform .25s;
+  }
+
+  .hint svg{
+    width:28px;
+    height:28px;
+    display:block;
+    transform-origin:center;
+    animation: hint-bob 1200ms infinite ease-in-out;
+    opacity:0.92;
+  }
+  @keyframes hint-bob {
+    0%{ transform:translateY(0) }
+    50%{ transform:translateY(-8px) }
+    100%{ transform:translateY(0) }
+  }
+
+  .hint .label{
+    font-size:13px;
+    background: rgba(255,255,255,0.9);
+    padding:6px 10px;
+    border-radius:999px;
+    box-shadow:0 4px 14px rgba(0,0,0,0.06);
+    color:#222;
+    font-weight:500;
+    letter-spacing:0.2px;
   }
 
   /* SLIDER под дверями */
@@ -89,7 +147,7 @@
   /* когда hero полностью скрыт, добавим класс */
   .hero.hidden { display:none; }
 
-  /* optional: небольшая тень/blur при частичном открытии (визуально) */
+  /* overlays небольшой fade при частичном открытии (опционально) */
   .left .overlay,
   .right .overlay {
     position:absolute;
@@ -103,19 +161,29 @@
 <body>
 
 <!-- HERO — поверх -->
-<div class="hero" id="hero" aria-hidden="false">
+<div class="hero" id="hero" aria-hidden="false" role="region" aria-label="Обложка — потяните вверх, чтобы открыть">
 
-  <div class="door left" id="leftDoor">
+  <div class="door left" id="leftDoor" aria-hidden="true">
     <img src="Обложка web.svg" alt="Обложка">
+    <div class="inner-edge" aria-hidden="true"></div>
     <div class="overlay"></div>
   </div>
 
-  <div class="door right" id="rightDoor">
+  <div class="door right" id="rightDoor" aria-hidden="true">
     <img src="Обложка web.svg" alt="Обложка справа">
+    <div class="inner-edge" aria-hidden="true"></div>
     <div class="overlay"></div>
   </div>
 
-  <div class="spine" id="spine"></div>
+  <div class="spine" id="spine" aria-hidden="true"></div>
+
+  <div class="hint" id="hint" aria-hidden="true">
+    <!-- простая стрелка вверх (SVG) -->
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <polyline points="6 15 12 9 18 15"></polyline>
+    </svg>
+    <div class="label">Потяни вверх</div>
+  </div>
 </div>
 
 <!-- SLIDER (контент под дверями) -->
@@ -136,14 +204,10 @@
 
 <script>
 /*
-  Логика:
-  - progress: 0..1 — насколько створки открыты
-  - управление жестом:
-      pointerdown -> pointermove -> pointerup (для mouse+touch+pen)
-      wheel -> изменяет progress (desktop)
-  - пока progress < 1 — slider заблокирован (pointer-events:none, overflow hidden)
-  - когда progress >= 1 (двери открыты) — скрываем hero и разблокируем slider
-  - при движении вниз (negative delta) — прогресс уменьшается, и если опустился до 0 — двери полностью закрыты
+  Progressive drag + initial visible gap + hint.
+  - INITIAL_GAP_VW: небольшой видимый зазор при закрытом состоянии
+  - MAX_GAP_VW: сдвиг при progress=1
+  - MAX_DRAG_PX: сколько пикселей свайпа вверх = progress 1
 */
 
 (function(){
@@ -152,97 +216,117 @@
   const rightDoor = document.getElementById('rightDoor');
   const spine = document.getElementById('spine');
   const slider = document.getElementById('slider');
+  const hint = document.getElementById('hint');
 
-  // Параметры
-  const MAX_GAP_VW = 50; // соответствует CSS var --max-gap-vw
-  const MAX_DRAG_PX = Math.max(window.innerHeight * 0.6, 240); //  сколько пикселей свайпа = прогресс 1
-  const WHEEL_SENSITIVITY = 0.0025; // как быстро колесо меняет прогресс (настраивай)
-  const OPEN_THRESHOLD = 0.98; // при >= этого значения считаем открытым
-  const CLOSE_THRESHOLD = 0.02; // при <= этого значения считаем закрытым
+  // Настройки (можно править)
+  const INITIAL_GAP_VW = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--initial-gap-vw')) || 2;
+  const MAX_GAP_VW     = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--max-gap-vw')) || 50;
+  let MAX_DRAG_PX = Math.max(window.innerHeight * 0.6, 240);
+  const WHEEL_SENSITIVITY = 0.0025;
+  const OPEN_THRESHOLD = 0.98;
+  const CLOSE_THRESHOLD = 0.02;
 
   let progress = 0; // 0..1
   let pointerActive = false;
   let startY = 0;
-  let accumWheel = 0;
-  let opened = false; // окончательно открыли и скрыли hero
+  let opened = false;
   let lastPointerId = null;
+  let hintDismissed = false;
 
-  // блокируем скролл/взаимодействие со slider пока не открыто
-  function blockSlider(){
-    slider.style.pointerEvents = 'none';
-    slider.style.overflowY = 'hidden';
-  }
-  function unblockSlider(){
-    slider.style.pointerEvents = 'auto';
-    slider.style.overflowY = 'auto';
-  }
+  // initially show hint
+  hint.style.opacity = '1';
+  hint.setAttribute('aria-hidden','false');
 
-  // инициално блокируем
+  // block slider until opened
+  function blockSlider(){ slider.style.pointerEvents = 'none'; slider.style.overflowY = 'hidden'; }
+  function unblockSlider(){ slider.style.pointerEvents = 'auto'; slider.style.overflowY = 'auto'; }
+
   blockSlider();
 
-  // обновляем визуалку по текущему progress
-  function renderProgress() {
-    // left moves left (negative), right moves right (positive)
-    const pxShift = (progress * MAX_GAP_VW); // in vw units
-    // set transforms as vw values
-    leftDoor.style.transform = `translateX(${-pxShift} )`; // pxShift already includes 'vw' unit below
-    rightDoor.style.transform = `translateX(${pxShift} )`;
-
-    // But we need vw units; append 'vw'
-    leftDoor.style.transform = `translateX(${-pxShift}vw)`;
-    rightDoor.style.transform = `translateX(${pxShift}vw)`;
-
-    // subtle shadow / spine opacity
-    spine.style.opacity = String(1 - progress);
-
-    // optional: overlays fade
-    const overlays = document.querySelectorAll('.overlay');
-    overlays.forEach(o => o.style.opacity = String(Math.max(0, 0.3 * (1 - progress))));
-  }
-
-  // utility clamp
   function clamp(v, a=0, b=1){ return Math.max(a, Math.min(b, v)); }
 
-  // set progress and react on thresholds
-  function setProgress(v, opts = {}) {
+  // update visual: include initial gap
+  function renderProgress(){
+    // compute total shift in vw from center for each side
+    // shiftVW = initialGap + progress * (maxGap - initialGap)
+    const shiftVW = INITIAL_GAP_VW + progress * (MAX_GAP_VW - INITIAL_GAP_VW);
+    leftDoor.style.transform = `translateX(${-shiftVW}vw)`;
+    rightDoor.style.transform = `translateX(${shiftVW}vw)`;
+
+    // spine visibility: more transparent when open
+    spine.style.opacity = String(1 - Math.min(1, progress * 1.1));
+
+    // overlays fade
+    const overlays = document.querySelectorAll('.overlay');
+    overlays.forEach(o => o.style.opacity = String(Math.max(0, 0.28 * (1 - progress))));
+
+    // hint fade faster
+    if (!hintDismissed) {
+      hint.style.opacity = String(Math.max(0, 1 - progress*1.6));
+    }
+  }
+
+  function setProgress(v){
     progress = clamp(v, 0, 1);
     renderProgress();
-
+    // if passed open threshold and not yet opened — finalize
     if (!opened && progress >= OPEN_THRESHOLD) {
-      // consider fully opened: hide hero and enable slider
       opened = true;
-      // небольшая задержка, чтобы завершилось "визуальное финальное" состояние
-      setTimeout(()=> {
-        hero.classList.add('hidden'); // display:none
+      // small delay so UI shows final opened position, then hide hero and enable slider
+      setTimeout(() => {
+        hero.classList.add('hidden');
         unblockSlider();
-      }, 60); // малое время — визуально уже открыто
+      }, 80);
+      // mark hint dismissed
+      dismissHint();
     } else if (!opened && progress > 0) {
-      // still in partial open: ensure hero visible and slider blocked
+      // keep hero visible and slider blocked
       hero.classList.remove('hidden');
       blockSlider();
     } else if (!opened && progress <= CLOSE_THRESHOLD) {
-      // полностью закрыто — ничего делать (hero виден, slider заблокирован)
+      // fully closed
       hero.classList.remove('hidden');
       blockSlider();
     }
   }
 
-  // Pointer events for touch/mouse
+  // animate numeric progress to target (tiny ease-out)
+  function animateProgressTo(target, duration = 200, cb){
+    const start = performance.now();
+    const from = progress;
+    const diff = target - from;
+    function step(t){
+      const dt = t - start;
+      const ratio = clamp(dt / duration, 0, 1);
+      const eased = 1 - Math.pow(1 - ratio, 3);
+      setProgress(from + diff * eased);
+      if (ratio < 1) requestAnimationFrame(step);
+      else if (cb) cb();
+    }
+    requestAnimationFrame(step);
+  }
+
+  // dismiss or hide hint
+  function dismissHint(){
+    hintDismissed = true;
+    hint.style.opacity = '0';
+    hint.setAttribute('aria-hidden','true');
+  }
+
+  // Pointer handlers (pointer API covers mouse + touch + pen)
   function onPointerDown(e){
-    // если уже полностью открыто и скрыто — не нужно ловить
     if (opened) return;
-    // только главный указатель
     pointerActive = true;
     lastPointerId = e.pointerId;
     startY = e.clientY;
-    // захват события, чтобы pointermove приходил даже если мышь вне области
-    (e.target).setPointerCapture && (e.target).setPointerCapture(e.pointerId);
+    // when user starts interacting — hide hint soon
+    dismissHint();
+    try { e.target.setPointerCapture && e.target.setPointerCapture(e.pointerId); } catch(e){}
   }
 
   function onPointerMove(e){
-    if (!pointerActive || e.pointerId !== lastPointerId) return;
-    const dy = startY - e.clientY; // вверх -> positive
-    // progress relative to MAX_DRAG_PX
+    if (!pointerActive || opened || e.pointerId !== lastPointerId) return;
+    const dy = startY - e.clientY; // swipe up -> positive
     const p = clamp(dy / MAX_DRAG_PX, 0, 1);
     setProgress(p);
   }
@@ -251,75 +335,48 @@
     if (!pointerActive || e.pointerId !== lastPointerId) return;
     pointerActive = false;
     lastPointerId = null;
-    // если пользователь отпустил и прогресс < 1, можно решить: вернуть назад (закрыть)
-    // или при небольшом прогрессе откатить к 0, при достаточном — довести до 1.
+    // finalize: if progress > 0.45 -> open, else -> close
     if (!opened) {
-      if (progress > 0.5) {
-        // доводим до 1 (анимация плавная via CSS transition if you want)
-        // чтобы сделать плавный "финал", используем небольшую JS-анимацию
-        animateProgressTo(1, 180, () => {/* will be hidden by setProgress */});
-      } else {
-        animateProgressTo(0, 180);
-      }
+      if (progress > 0.45) animateProgressTo(1, 220);
+      else animateProgressTo(0, 180);
     }
   }
 
-  // Wheel handling for desktop (накручиваем/откручиваем прогресс)
+  // Wheel handler for desktop
   function onWheel(e){
-    // если уже открыто — не мешаем; let default scroll work
-    if (opened) return;
+    if (opened) return; // normal scroll after open
     e.preventDefault();
-    // deltaY > 0 means scroll down (user wants move content up), so open doors
-    const d = e.deltaY;
-    const deltaProgress = d * WHEEL_SENSITIVITY;
-    setProgress(progress + deltaProgress);
-    // если перешли порог, окончательно открываем
-    if (progress >= OPEN_THRESHOLD) {
-      setProgress(1);
-    }
+    dismissHint();
+    const delta = e.deltaY * WHEEL_SENSITIVITY;
+    setProgress(progress + delta);
+    // if moved enough, finalize to 1
+    if (progress >= OPEN_THRESHOLD) setProgress(1);
   }
 
-  // Анимировать прогресс до целевого значения (простая линейная анимация)
-  function animateProgressTo(target, duration = 200, cb){
-    const start = performance.now();
-    const from = progress;
-    const diff = target - from;
-    function step(t){
-      const dt = t - start;
-      const ratio = clamp(dt / duration, 0, 1);
-      // ease-out
-      const eased = 1 - Math.pow(1 - ratio, 3);
-      setProgress(from + diff * eased);
-      if (ratio < 1) requestAnimationFrame(step);
-      else {
-        if (cb) cb();
-      }
-    }
-    requestAnimationFrame(step);
-  }
+  // click on hero can also open
+  hero.addEventListener('click', (e) => {
+    if (opened) return;
+    // quick open via click
+    animateProgressTo(1, 220);
+    dismissHint();
+  });
 
-  // Подключаем обработчики
-  // pointer events на hero (чтобы поймать mouse и touch одинаково)
+  // listeners
   hero.addEventListener('pointerdown', onPointerDown, {passive:false});
   window.addEventListener('pointermove', onPointerMove, {passive:false});
   window.addEventListener('pointerup', onPointerUp, {passive:false});
   window.addEventListener('pointercancel', onPointerUp, {passive:false});
-
-  // wheel (desktop)
   window.addEventListener('wheel', onWheel, {passive:false});
 
-  // Кроки: на ресайзе обновляем MAX_DRAG_PX
+  // recompute drag length on resize (optional)
   window.addEventListener('resize', () => {
-    // recompute sensible max drag
-    // (we keep same variable name but can't reassign const; recompute locally if needed)
-    // For simplicity, we'll not change MAX_DRAG_PX here; browser resize is rare during gesture.
+    MAX_DRAG_PX = Math.max(window.innerHeight * 0.6, 240);
+    // re-render positions with current progress (in case vw->px changed)
+    renderProgress();
   });
 
-  // Инициалное рендерирование
+  // init
   setProgress(0);
-
-  // Дополнительно: если хочешь после открытия автоматический скролл к следующему слайду — добавь:
-  // animateProgressTo(1, 180, () => { hero.classList.add('hidden'); unblockSlider(); slider.scrollTo({ top: window.innerHeight, behavior: 'smooth' }); });
 
 })();
 </script>
