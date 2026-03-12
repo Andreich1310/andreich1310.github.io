@@ -2,141 +2,134 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>Исправление створок с 3D</title>
+  <title>Исправление створок с 3D — обновлено</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <style>
-  :root {
+  :root{
     --initial-gap-vw: 2;
     --max-gap-vw: 50;
     --anim-duration: 300ms;
   }
-  html, body {
-    margin: 0; height: 100%; overflow: hidden;
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-  }
+  html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial;}
 
   /* ===== Двери (hero) ===== */
-  .hero {
-    position: fixed;
-    inset: 0;
-    z-index: 50;
-    display: flex;
-    pointer-events: auto;
-    touch-action: none;
-    background: transparent;
-    overflow: hidden;
-    perspective: 1200px; /* перспектива для 3D */
+  .hero{
+    position:fixed; inset:0; z-index:50;
+    display:flex; pointer-events:auto; touch-action:none;
+    background:transparent; overflow:visible;
+    perspective:1200px; /* перспектива для 3D */
+    -webkit-font-smoothing:antialiased;
   }
-  .door {
-    position: relative;
-    width: 50%;
-    height: 100%;
-    overflow: hidden;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    transform-style: preserve-3d; /* для 3D-поворота */
-    transition: transform 0.25s ease-out;
-    -webkit-user-select: none;
-    user-select: none;
+  .door{
+    position:relative;
+    width:50%;
+    height:100%;
+    overflow:hidden;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    transform-style:preserve-3d;
+    transition:transform 0.25s ease-out;
+    -webkit-user-select:none; user-select:none;
+    backface-visibility:hidden;
+    will-change:transform;
   }
 
-  /* важно: явное позиционирование и z-index у изображения,
-     чтобы внутренние полупрозрачные элементы могли перекрывать его */
-  .door img {
-    position: relative;
-    z-index: 1; /* ниже, чем .inner-edge */
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-    -webkit-user-drag: none;
-    user-drag: none;
-  }
-  .door.left img { object-position: right center; }
-  .door.right img { object-position: left center; }
+  /* Вращаем вокруг внутренней кромки (правильный hinge) */
+  .door.left{ transform-origin: right center; }
+  .door.right{ transform-origin: left center; }
 
-  /* Лёгкая тень у внутренних краёв створок для объёма */
-  .inner-edge {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 12px; /* чуть шире для большей видимости */
-    pointer-events: none;
-    z-index: 3; /* выше, чем .door img */
-    mix-blend-mode: multiply; /* аккуратнее накладывается на изображение */
-    will-change: opacity, transform;
+  .door img{
+    position:relative;
+    z-index:1; /* ниже внутренних кромок и центральной тени */
+    width:100%; height:100%;
+    object-fit:cover; display:block;
+    -webkit-user-drag:none; user-drag:none;
   }
-  .left .inner-edge {
-    right: 0;
-    background: linear-gradient(to left, rgba(0,0,0,0.22), rgba(0,0,0,0.06) 40%, transparent 100%);
-    box-shadow: inset -2px 0 6px rgba(0,0,0,0.08);
+  .door.left img{ object-position: right center; }
+  .door.right img{ object-position: left center; }
+
+  /* Внутренняя кромка (тонкая тень вдоль шва) */
+  .inner-edge{
+    position:absolute; top:0; bottom:0;
+    width:12px; pointer-events:none;
+    z-index:6; /* поверх изображения */
+    mix-blend-mode:multiply;
+    transition:opacity .18s;
   }
-  .right .inner-edge {
-    left: 0;
-    background: linear-gradient(to right, rgba(0,0,0,0.22), rgba(0,0,0,0.06) 40%, transparent 100%);
-    box-shadow: inset 2px 0 6px rgba(0,0,0,0.08);
+  .left .inner-edge{
+    right:0;
+    background: linear-gradient(to left, rgba(0,0,0,0.28), rgba(0,0,0,0.06) 36%, transparent 100%);
+    box-shadow: inset -2px 0 8px rgba(0,0,0,0.08);
+  }
+  .right .inner-edge{
+    left:0;
+    background: linear-gradient(to right, rgba(0,0,0,0.28), rgba(0,0,0,0.06) 36%, transparent 100%);
+    box-shadow: inset 2px 0 8px rgba(0,0,0,0.08);
   }
 
-  /* Подсказка (стрелка и текст) */
-  .hint {
-    position: absolute;
-    left: 50%; bottom: 12vh;
-    transform: translateX(-50%);
-    text-align: center;
-    pointer-events: none;
-    opacity: 1;
-    transition: opacity 0.25s, transform 0.25s;
-    z-index: 70;
-    color: #222;
-    font-weight: 500;
+  /* Центровая "отбрасываемая" тень, видимая над контентом под створками */
+  .cast-shadow{
+    position:absolute;
+    left:0; right:0;
+    bottom:0;
+    height:36vh; /* область, куда будет падать тень */
+    pointer-events:none;
+    z-index:2; /* между изображением (z:1) и inner-edge (z:6) */
+    background: linear-gradient(to top,
+      rgba(0,0,0,0.45) 0%,
+      rgba(0,0,0,0.22) 20%,
+      rgba(0,0,0,0.08) 40%,
+      transparent 100%);
+    opacity:0.6;
+    transition:opacity .18s, transform .18s;
+    mask-image: linear-gradient(to top, black 0%, transparent 90%); /* мягкое исчезание */
   }
-  .hint svg {
-    width: 28px; height: 28px;
-    animation: bob 1.2s infinite ease-in-out;
+
+  /* Подсказка (стрелка и текст) — вертикальный стек через flex */
+  .hint{
+    position:absolute;
+    left:50%; bottom:12vh;
+    transform:translateX(-50%);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:8px;
+    pointer-events:none;
+    opacity:1;
+    transition:opacity 0.25s, transform 0.25s;
+    z-index:70;
+    color:#222;
+    font-weight:500;
   }
-  @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
-  .hint .label {
-    margin-top: 8px;
-    background: rgba(255,255,255,0.92);
-    padding: 6px 10px;
-    border-radius: 999px;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.06);
-    font-size: 13px;
-    display: inline-block;
+  .hint svg{
+    width:28px; height:28px;
+    display:block; /* гарантирует свою строку */
+    animation:bob 1.2s infinite ease-in-out;
   }
-  .hint.used {
-    opacity: 0;
-    transform: translateX(-50%) translateY(8px);
-    pointer-events: none;
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+  .hint .label{
+    background: rgba(255,255,255,0.94);
+    padding:6px 10px;
+    border-radius:999px;
+    box-shadow:0 4px 14px rgba(0,0,0,0.06);
+    font-size:13px;
+    display:block;
   }
+  .hint.used{ opacity:0; transform:translateX(-50%) translateY(8px); pointer-events:none; }
 
   /* ===== Скроллер (slider) ===== */
-  .slider {
-    position: relative;
-    z-index: 1;
-    height: 100dvh;
-    overflow-y: auto;
-    scroll-snap-type: y mandatory;
-    -webkit-overflow-scrolling: touch;
+  .slider{
+    position:relative; z-index:1;
+    height:100dvh; overflow-y:auto;
+    scroll-snap-type:y mandatory; -webkit-overflow-scrolling:touch;
   }
-  .slide {
-    height: 100dvh;
-    scroll-snap-align: start;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-  }
-  .slide img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
+  .slide{ height:100dvh; scroll-snap-align:start; display:flex; justify-content:center; align-items:center; }
+  .slide img{ width:100%; height:100%; object-fit:cover; display:block; }
 
   /* Когда двери полностью открыты, скрываем слой */
-  .hero.hidden { display: none; }
+  .hero.hidden{ display:none; }
   </style>
 </head>
 <body>
@@ -147,10 +140,15 @@
     <img src="Обложка web.svg" alt="">
     <div class="inner-edge"></div>
   </div>
+
+  <!-- центральная отбрасываемая тень под створками (лежит поверх контента, но под inner-edge) -->
+  <div class="cast-shadow" id="castShadow" aria-hidden="true"></div>
+
   <div class="door right" aria-hidden="true">
     <img src="Обложка web.svg" alt="">
     <div class="inner-edge"></div>
   </div>
+
   <div class="hint" id="hint" role="status" aria-live="polite">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -180,33 +178,53 @@
   const hint = document.getElementById('hint');
   const leftDoor = document.querySelector('.door.left');
   const rightDoor = document.querySelector('.door.right');
+  const castShadow = document.getElementById('castShadow');
 
   let startY = null, opened = false;
+  let progress = 0;
 
-  function blockSlider() {
-    slider.style.pointerEvents = 'none';
-    slider.style.overflowY = 'hidden';
-  }
-  function unblockSlider() {
-    slider.style.pointerEvents = 'auto';
-    slider.style.overflowY = 'auto';
-  }
+  function blockSlider(){ slider.style.pointerEvents='none'; slider.style.overflowY='hidden'; }
+  function unblockSlider(){ slider.style.pointerEvents='auto'; slider.style.overflowY='auto'; }
   blockSlider();
 
-  let progress = 0;
-  function setProgress(p) {
+  function setProgress(p){
     progress = Math.max(0, Math.min(1, p));
     const initial = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--initial-gap-vw')) || 2;
     const maxGap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--max-gap-vw')) || 50;
     const shift = initial + progress * (maxGap - initial);
 
-    const rotateMax = 8; // градусы поворота для 3D
-    leftDoor.style.transform = `translateX(${-shift}vw) rotateY(${-progress * rotateMax}deg)`;
-    rightDoor.style.transform = `translateX(${shift}vw) rotateY(${progress * rotateMax}deg)`;
+    const rotateMax = 18; // усиленный угол поворота (было 8)
+    const zDepth = 40;    // пиксели translateZ для эффекта глубины
 
+    // left opens to left (negative translateX) and rotates around right edge
+    leftDoor.style.transform = `
+      translateX(${-shift}vw)
+      translateZ(${ -progress *  (zDepth/2) }px)
+      rotateY(${-progress * rotateMax}deg)
+    `;
+    // right opens to right
+    rightDoor.style.transform = `
+      translateX(${shift}vw)
+      translateZ(${ -progress * (zDepth/2) }px)
+      rotateY(${progress * rotateMax}deg)
+    `;
+
+    // подсказка постепенно исчезает
     hint.style.opacity = String(Math.max(0, 1 - progress * 1.6));
 
-    if (progress >= 0.98 && !opened) {
+    // управляем видимостью и интенсивностью "отбрасываемой" тени
+    // когда створки почти закрыты (progress ≈ 0) — тень сильнее,
+    // при полном открытии — тень уходит.
+    const shadowOpacity = Math.max(0, 0.6 * (1 - progress)); 
+    castShadow.style.opacity = String(shadowOpacity);
+    // лёгкое смещение тени при открытии (параллакс): сдвигаем вверх по мере открытия
+    castShadow.style.transform = `translateY(${ -progress * 12 }px)`;
+
+    // inner-edge можно чуть подсвечивать при открытии (опционально)
+    const innerOpacity = 0.4 + (0.6 * (1 - progress));
+    document.querySelectorAll('.inner-edge').forEach(el => el.style.opacity = innerOpacity.toString());
+
+    if (progress >= 0.98 && !opened){
       opened = true;
       setTimeout(()=>{
         hero.classList.add('hidden');
@@ -215,9 +233,9 @@
     }
   }
 
-  function animateTo(target, duration) {
+  function animateTo(target, duration){
     const start = performance.now(), from = progress;
-    function step(now) {
+    function step(now){
       const t = Math.min(1, (now - start) / duration);
       const eased = 1 - Math.pow(1 - t, 3);
       setProgress(from + (target - from) * eased);
@@ -230,9 +248,9 @@
   window.addEventListener('pointerdown', e => {
     if (opened) return;
     startY = e.clientY;
-    // не удаляем подсказку из DOM, а просто скрываем (чтобы не ломать a11y/анимации)
+    // скрываем подсказку через класс (не удаляем DOM)
     hint.classList.add('used');
-  }, {passive: false});
+  }, {passive:false});
 
   window.addEventListener('pointermove', e => {
     if (opened || startY === null) return;
@@ -240,35 +258,33 @@
     const p = Math.max(0, dy / (window.innerHeight * 0.6));
     setProgress(p);
     if (dy > 0) e.preventDefault();
-  }, {passive: false});
+  }, {passive:false});
 
   window.addEventListener('pointerup', e => {
     if (opened) return;
-    if (progress > 0.45) {
-      animateTo(1, 220);
-    } else {
-      animateTo(0, 180);
-    }
+    if (progress > 0.45) animateTo(1, 240);
+    else animateTo(0, 200);
     startY = null;
   });
 
-  // wheel (колёсико/трекпад)
+  // колесико/трекпад
   window.addEventListener('wheel', e => {
     if (opened) return;
-    // небольшая нормализация, можно скорректировать при необходимости
     e.preventDefault();
     const delta = e.deltaY * 0.0025;
     setProgress(progress + delta);
     if (progress >= 0.98) setProgress(1);
-  }, {passive: false});
+  }, {passive:false});
 
   // клик по обложке — открываем
   hero.addEventListener('click', e => {
     if (!opened) animateTo(1, 220);
   });
 
+  // стартовые значения
+  // при старте добавим небольшую видимость тени (коррекция для случаев, когда hero закрыт)
   setProgress(0);
 })();
 </script>
 </body>
-</html>
+  </html>
