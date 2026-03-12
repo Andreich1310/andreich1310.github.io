@@ -3,61 +3,88 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Doors — realistic door / trapezoid via 3D</title>
+<title>Doors — contour + top stretch + full open</title>
 <style>
 :root{ --gap-start:2; --gap-end:50; }
 
-html,body{
-  height:100%; margin:0; overflow:hidden; font-family:system-ui, -apple-system, "Segoe UI", Roboto, Arial;
-}
+html,body{height:100%;margin:0;overflow:hidden;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial}
 
-/* HERO (поверх слайдера) */
+/* HERO над слайдером */
 .hero{
   position:fixed; inset:0; display:flex; z-index:100;
-  perspective:1000px; /* чуть сильнее перспектива для выраженного 3D */
+  perspective:1000px; /* перспектива для 3D */
   pointer-events:auto; transition:opacity .28s ease;
   touch-action:none; background:transparent;
 }
 
-/* DOOR */
+/* DOOR — отвечает за вращение/смещение/глубину */
 .door{
   width:50%; height:100%; position:relative; overflow:visible;
   transform-style:preserve-3d; will-change:transform;
   transition: transform .35s cubic-bezier(.22,.61,.36,1);
   backface-visibility:hidden;
   z-index:30;
+  /* небольшая тень самой створки для объёма */
   box-shadow: 0 12px 30px rgba(0,0,0,0.06);
 }
-
-/* поворотный центр — шов (чтобы scaleY растягивался по шву) */
 .left{ transform-origin: right center; }
 .right{ transform-origin: left center; }
 
-.door img{
+/* PANEL — внутренний слой: содержит img, тень и контур; на него делаем scaleY.
+   transform-origin у панели установлен внизу, чтобы scaleY растягивал вверх. */
+.panel{
+  position:absolute;
+  inset:0;
+  transform-style:preserve-3d;
+  will-change:transform;
+  z-index:40; /* над тенью в большинстве случаев */
+  display:block;
+}
+
+/* разный origin для панели, чтобы "шов" оставался у нужного края */
+.left .panel{ transform-origin: right bottom; }
+.right .panel{ transform-origin: left bottom; }
+
+/* контур панели — тонкая рамка поверх панели */
+.panel::before{
+  content:"";
+  position:absolute; inset:0;
+  pointer-events:none;
+  z-index:65;
+  border: 1px solid rgba(0,0,0,0.08); /* контур */
+  box-shadow: 0 1px 0 rgba(255,255,255,0.02) inset;
+  border-radius: 0;
+}
+
+/* картинка внутри панели */
+.panel img{
   width:100%; height:100%; object-fit:cover; display:block;
-  position:relative; z-index:40;
+  position:relative;
+  z-index:60; /* над контуром? (контур z-index:65 — но псевдоэлемент для аккуратности) */
   transform-style:preserve-3d; will-change:transform;
 }
 
-/* door-shadow — внутри двери, следует за трансформом панели, но лежит "за" картинкой (ниже по z-индексу) */
+/* тень внутри панели — следует за панелью (она внутри .panel) и лежит "за" картинкой */
 .door-shadow{
-  position:absolute; top:0; bottom:0; width:10vw; pointer-events:none;
-  filter:blur(18px); opacity:.9; z-index:10;
+  position:absolute; top:0; bottom:0;
+  width:10vw; pointer-events:none;
+  filter:blur(18px); opacity:.9;
+  z-index:30; /* ниже изображения (z-index:60) */
+  transform-style:preserve-3d;
   transition: opacity .22s linear, transform .22s linear;
-  will-change:opacity, transform; transform-style:preserve-3d;
-  /* базовая глубина тени (чтобы она визуально падала на слайд) */
+  /* даём тени положительное смещение наружу, чтобы она падала на слайд */
   transform: translateZ(-80px);
 }
 .door-shadow.left{ right:-6vw; background: linear-gradient(to right, rgba(0,0,0,.72), rgba(0,0,0,.32), transparent); }
 .door-shadow.right{ left:-6vw;  background: linear-gradient(to left,  rgba(0,0,0,.72), rgba(0,0,0,.32), transparent); }
 
-/* внутренняя кромка (над картинками) */
-.inner-edge{ position:absolute; top:0; bottom:0; width:16px; z-index:50; pointer-events:none; mix-blend-mode:multiply; }
+/* внутренний край (над всем), чтобы было ощущение кромки */
+.inner-edge{ position:absolute; top:0; bottom:0; width:16px; z-index:70; pointer-events:none; mix-blend-mode:multiply; }
 .left .inner-edge{ right:0; background:linear-gradient(to left, rgba(0,0,0,.46), rgba(0,0,0,.06) 36%, transparent 100%); }
-.right .inner-edge{ left:0;  background:linear-gradient(to right, rgba(0,0,0,.46), rgba(0,0,0,.06) 36%, transparent 100%); }
+.right .inner-edge{ left:0; background:linear-gradient(to right, rgba(0,0,0,.46), rgba(0,0,0,.06) 36%, transparent 100%); }
 
-/* hint поверх всего */
-.hint{ position:absolute; left:50%; bottom:12vh; transform:translateX(-50%); z-index:60; display:flex; flex-direction:column; align-items:center; gap:8px; pointer-events:none; transition:opacity .18s;}
+/* hint */
+.hint{ position:absolute; left:50%; bottom:12vh; transform:translateX(-50%); z-index:80; display:flex; flex-direction:column; align-items:center; gap:8px; pointer-events:none; transition:opacity .18s;}
 .hint svg{ width:28px; height:28px; display:block; animation:bob 1.2s infinite ease-in-out; }
 @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
 .label{ background:rgba(255,255,255,.96); padding:6px 12px; border-radius:999px; box-shadow:0 6px 18px rgba(0,0,0,.08); font-size:13px; }
@@ -79,17 +106,22 @@ html,body{
 <body>
 
 <div class="hero" id="hero" aria-hidden="false">
+
   <div class="door left" id="leftDoor" aria-hidden="true">
-    <div class="door-shadow left" aria-hidden="true"></div>
-    <!-- сохраняем <img> как у тебя было -->
-    <img src="Обложка web.svg" alt="">
-    <div class="inner-edge"></div>
+    <div class="panel">
+      <div class="door-shadow left" aria-hidden="true"></div>
+      <!-- сохраняем <img> как у тебя было -->
+      <img src="Обложка web.svg" alt="">
+      <div class="inner-edge"></div>
+    </div>
   </div>
 
   <div class="door right" id="rightDoor" aria-hidden="true">
-    <div class="door-shadow right" aria-hidden="true"></div>
-    <img src="Обложка web.svg" alt="">
-    <div class="inner-edge"></div>
+    <div class="panel">
+      <div class="door-shadow right" aria-hidden="true"></div>
+      <img src="Обложка web.svg" alt="">
+      <div class="inner-edge"></div>
+    </div>
   </div>
 
   <div class="hint" id="hint">
@@ -111,11 +143,13 @@ html,body{
 const hero = document.getElementById('hero');
 const leftDoor = document.getElementById('leftDoor');
 const rightDoor = document.getElementById('rightDoor');
+const leftPanel = leftDoor.querySelector('.panel');
+const rightPanel = rightDoor.querySelector('.panel');
 const hint = document.getElementById('hint');
 const slider = document.getElementById('slider');
 
 const SWIPE_DISTANCE_FACTOR = 0.12;
-const DISABLE_HERO_AT = 0.98;
+const DISABLE_HERO_AT = 0.999; // не блокируем раньше — даём пройти до конца
 
 let progress = 0;
 let isDragging = false;
@@ -130,58 +164,52 @@ const clamp = v => Math.max(0, Math.min(1, v));
 function render(p){
   progress = clamp(p);
 
-  const shift = 2 + progress*(50-2); // vw - линейный сдвиг створок
-  const rot = 38; // поворот по Y (петли)
+  const shift = 2 + progress*(50-2); // vw - сдвиг створок
+  const rot = 38; // deg - поворот по Y (петли)
 
-  // Реалистичная "дверная" трансформация (вместо skewY)
-  // - translateZ: внутренняя грань уходит в глубину
-  // - rotateX: небольшое наклонение панели (даёт вид трапеции сверху/снизу)
-  // - scaleY: растягивает створку по высоте у шва (усилено вдвое)
-  const doorDepth = progress * 80;           // px, насколько дверь уходит вглубь
-  const rotateX = progress * 6;              // deg — наклон панели по X
-  const scaleY = 1 + progress * 0.12;        // усиленное растяжение по Y (вдвое больше)
-  // оставляем rotateY для петли (открытие)
+  // глубина и наклон панели
+  const doorDepth = progress * 80;       // px внутренняя грань уходит в глубь
+  const rotateX = progress * 6;          // deg небольшой наклон панели по X
+  // усиленное растяжение по Y у шва (вдвое усилили ранее)
+  const scaleY = 1 + progress * 0.12;
 
-  // Левая створка (pivot справа)
+  // вращение/глубина панели: применяется к .door
   leftDoor.style.transform = `
     translateX(${-shift}vw)
     rotateY(${-progress * rot}deg)
     translateZ(${-doorDepth}px)
     rotateX(${rotateX}deg)
-    scaleY(${scaleY})
   `;
-
-  // Правая створка (pivot слева)
   rightDoor.style.transform = `
     translateX(${shift}vw)
     rotateY(${progress * rot}deg)
     translateZ(${-doorDepth}px)
     rotateX(${rotateX}deg)
-    scaleY(${scaleY})
   `;
 
-  // Немного подвинем изображение по Z, чтобы оно выглядело "перед" тенью
-  // (изображение остаётся ближе, тень — дальше)
-  const imgZ = -progress * 18; // px
-  leftDoor.querySelector('img').style.transform = `translateZ(${imgZ}px)`;
-  rightDoor.querySelector('img').style.transform = `translateZ(${imgZ}px)`;
+  // scaleY панели (растягивает вверх, потому что panel transform-origin = bottom)
+  leftPanel.style.transform = `scaleY(${scaleY})`;
+  rightPanel.style.transform = `scaleY(${scaleY})`;
 
-  // Тени внутри дверей: уменьшаем opacity по мере открытия
-  const ls = leftDoor.querySelector('.door-shadow');
-  const rs = rightDoor.querySelector('.door-shadow');
-  ls.style.opacity = String(Math.max(0, 0.9 - progress * 1.05));
-  rs.style.opacity = String(Math.max(0, 0.9 - progress * 1.05));
+  // Лёгкий сдвиг изображения по Z чтобы оно оставалось "перед" тенью
+  const imgZ = -progress * 18; // px
+  leftPanel.querySelector('img').style.transform = `translateZ(${imgZ}px)`;
+  rightPanel.querySelector('img').style.transform = `translateZ(${imgZ}px)`;
+
+  // Тени внутри панели — уменьшаем opacity по мере открытия
+  leftPanel.querySelector('.door-shadow').style.opacity = String(Math.max(0, 0.9 - progress * 1.05));
+  rightPanel.querySelector('.door-shadow').style.opacity = String(Math.max(0, 0.9 - progress * 1.05));
 
   // Подсказка
   hint.style.opacity = String(Math.max(0, 1 - progress * 1.6));
 
-  // НЕ скрываем визуально hero — только отключаем pointer-events при полном открытии
+  // при полностью открытом положении — блокируем только pointer-events и выставляем aria
   if(progress >= DISABLE_HERO_AT){
     hero.style.pointerEvents = 'none';
-    hero.setAttribute('aria-hidden', 'true');
+    hero.setAttribute('aria-hidden','true');
   } else {
     hero.style.pointerEvents = 'auto';
-    hero.setAttribute('aria-hidden', 'false');
+    hero.setAttribute('aria-hidden','false');
   }
 }
 
@@ -192,12 +220,19 @@ function animateTo(target, duration = 360){
     const t = Math.min(1, (now - start) / duration);
     const eased = 1 - Math.pow(1 - t, 3);
     render(from + (target - from) * eased);
-    if(t < 1) requestAnimationFrame(step);
+    if(t < 1) {
+      requestAnimationFrame(step);
+    } else {
+      // гарантируем точное конечное состояние (избежать округлений)
+      render(target);
+      // если целевой = 1 — окончательно отключаем взаимодействие
+      if(target >= 1) { hero.style.pointerEvents = 'none'; hero.setAttribute('aria-hidden','true'); }
+    }
   }
   requestAnimationFrame(step);
 }
 
-/* Pointer / swipe handling (как в предыдущей версии) */
+/* Pointer / swipe handling */
 window.addEventListener('pointerdown', function(e){
   if(e.target.closest('.hero') && getComputedStyle(hero).pointerEvents !== 'none'){
     isDragging = true; potentialClose = false;
@@ -279,8 +314,7 @@ window.addEventListener('keydown', function(e){
 
 render(0);
 window.addEventListener('resize', ()=>render(progress));
-
 })();
 </script>
 </body>
-</html>
+  </html>
