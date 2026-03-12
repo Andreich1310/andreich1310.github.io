@@ -3,180 +3,40 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Doors — upgraded (slider snap fixed)</title>
-
+<title>Doors — slider snap fixed (robust)</title>
 <style>
 :root{
   --gap-start:.5;
   --gap-end:50;
 }
-
-html,body{
-  height:100%;
-  margin:0;
-  overflow:hidden;
-  font-family:system-ui;
-}
-
-.hero{
-  position:fixed;
-  inset:0;
-  display:flex;
-  perspective:1000px;
-  z-index:100;
-  transition:opacity .35s cubic-bezier(.22,.61,.36,1);
-  touch-action:none;
-}
-
-.hero.dragging .door,
-.hero.dragging .panel,
-.hero.dragging .door img,
-.hero.dragging .door-shadow,
-.hero.dragging .hint{
-  transition:none !important;
-}
-
-.door{
-  width:50%;
-  height:100%;
-  position:relative;
-  transform-style:preserve-3d;
-  will-change:transform;
-  overflow:visible;
-}
-
-.left{ transform-origin:right center; }
-.right{ transform-origin:left center; }
-
-.panel{
-  position:absolute;
-  inset:0;
-  transform-style:preserve-3d;
-  will-change:transform;
-  transition:transform .35s cubic-bezier(.22,.61,.36,1);
-}
-
-.left .panel{ transform-origin:right bottom; }
-.right .panel{ transform-origin:left bottom; }
-
-.panel::before{
-  content:"";
-  position:absolute;
-  inset:0;
-  border:1px solid rgba(0,0,0,.08);
-  pointer-events:none;
-  z-index:70;
-}
-
-.panel img{
-  width:100%;
-  height:100%;
-  object-fit:cover;
-  display:block;
-  position:relative;
-  z-index:60;
-  will-change:transform;
-  transition:transform .35s cubic-bezier(.22,.61,.36,1);
-}
-
-.left .panel img{ object-position:left center; }
-.right .panel img{ object-position:right center; }
-
-.door-shadow{
-  position:absolute;
-  top:0;
-  bottom:0;
-  width:10vw;
-  filter:blur(18px);
-  opacity:.9;
-  pointer-events:none;
-  transform-style:preserve-3d;
-  transition: opacity .22s linear, transform .22s linear;
-  transform: translateZ(-80px);
-  z-index:40;
-}
-.door-shadow.left{
-  right:-6vw;
-  background:linear-gradient(to right,rgba(0,0,0,.72), rgba(0,0,0,.32), transparent);
-}
-.door-shadow.right{
-  left:-6vw;
-  background:linear-gradient(to left,rgba(0,0,0,.72), rgba(0,0,0,.32), transparent);
-}
-
-.inner-edge{
-  position:absolute;
-  top:0;
-  bottom:0;
-  width:16px;
-  z-index:90;
-  pointer-events:none;
-  mix-blend-mode:multiply;
-}
+html,body{height:100%;margin:0;overflow:hidden;font-family:system-ui;}
+/* (оставил твои стили без изменений) */
+.hero{position:fixed;inset:0;display:flex;perspective:1000px;z-index:100;transition:opacity .35s cubic-bezier(.22,.61,.36,1);touch-action:none}
+.hero.dragging .door,.hero.dragging .panel,.hero.dragging .door img,.hero.dragging .door-shadow,.hero.dragging .hint{transition:none !important}
+.door{width:50%;height:100%;position:relative;transform-style:preserve-3d;will-change:transform;overflow:visible}
+.left{ transform-origin:right center; } .right{ transform-origin:left center; }
+.panel{position:absolute;inset:0;transform-style:preserve-3d;will-change:transform;transition:transform .35s cubic-bezier(.22,.61,.36,1)}
+.left .panel{ transform-origin:right bottom; } .right .panel{ transform-origin:left bottom; }
+.panel::before{content:"";position:absolute;inset:0;border:1px solid rgba(0,0,0,.08);pointer-events:none;z-index:70}
+.panel img{width:100%;height:100%;object-fit:cover;display:block;position:relative;z-index:60;will-change:transform;transition:transform .35s cubic-bezier(.22,.61,.36,1)}
+.left .panel img{ object-position:left center; } .right .panel img{ object-position:right center; }
+.door-shadow{position:absolute;top:0;bottom:0;width:10vw;filter:blur(18px);opacity:.9;pointer-events:none;transform-style:preserve-3d;transition: opacity .22s linear, transform .22s linear;transform: translateZ(-80px);z-index:40}
+.door-shadow.left{ right:-6vw;background:linear-gradient(to right,rgba(0,0,0,.72), rgba(0,0,0,.32), transparent); }
+.door-shadow.right{ left:-6vw;background:linear-gradient(to left,rgba(0,0,0,.72), rgba(0,0,0,.32), transparent); }
+.inner-edge{position:absolute;top:0;bottom:0;width:16px;z-index:90;pointer-events:none;mix-blend-mode:multiply}
 .left .inner-edge{ right:0; background:linear-gradient(to left, rgba(0,0,0,.46), rgba(0,0,0,.06) 36%, transparent 100%); }
 .right .inner-edge{ left:0; background:linear-gradient(to right, rgba(0,0,0,.46), rgba(0,0,0,.06) 36%, transparent 100%); }
-
-.hint{
-  position:absolute;
-  left:50%;
-  bottom:12vh;
-  transform:translateX(-50%);
-  z-index:120;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  gap:8px;
-  pointer-events:none;
-  transition:opacity .18s;
-}
-.hint svg{ width:28px; height:28px; display:block; animation:bob 1.2s infinite ease-in-out; }
+.hint{position:absolute;left:50%;bottom:12vh;transform:translateX(-50%);z-index:120;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;transition:opacity .18s}
+.hint svg{ width:28px;height:28px;display:block;animation:bob 1.2s infinite ease-in-out }
 @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
-.label{ background:rgba(255,255,255,.96); padding:6px 12px; border-radius:999px; box-shadow:0 6px 18px rgba(0,0,0,.08); font-size:13px; }
-
-.gap-light{
-  position:absolute;
-  left:50%;
-  top:0;
-  bottom:0;
-  width:6px;
-  transform:translateX(-50%);
-  pointer-events:none;
-  z-index:20;
-  background: linear-gradient(180deg, rgba(255,245,220,0.95), rgba(255,230,160,0.6));
-  filter: blur(18px);
-  opacity:0;
-  transition: opacity .26s linear, width .26s linear;
-}
-
-.slider{
-  position:relative;
-  height:100vh;
-  overflow-y:auto;
-  scroll-snap-type:y mandatory;
-  -webkit-overflow-scrolling:touch;
-}
-
-.slide{
-  height:100vh;
-  scroll-snap-align:start;
-}
-
-.slide img{
-  width:100%;
-  height:100%;
-  object-fit:cover;
-}
-
-@media (max-width:520px){
-  .door-shadow{ width:14vw; filter:blur(12px); }
-  .inner-edge{ width:12px; }
-  .door-shadow.left{ right:-10vw; }
-  .door-shadow.right{ left:-10vw; }
-  .gap-light{ width:10px; filter: blur(12px); }
-}
+.label{background:rgba(255,255,255,.96);padding:6px 12px;border-radius:999px;box-shadow:0 6px 18px rgba(0,0,0,.08);font-size:13px}
+.gap-light{position:absolute;left:50%;top:0;bottom:0;width:6px;transform:translateX(-50%);pointer-events:none;z-index:20;background: linear-gradient(180deg, rgba(255,245,220,0.95), rgba(255,230,160,0.6));filter: blur(18px);opacity:0;transition: opacity .26s linear, width .26s linear}
+.slider{position:relative;height:100vh;overflow-y:auto;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch}
+.slide{height:100vh;scroll-snap-align:start}
+.slide img{width:100%;height:100%;object-fit:cover}
+@media (max-width:520px){.door-shadow{ width:14vw; filter:blur(12px);} .inner-edge{ width:12px;} .door-shadow.left{ right:-10vw; } .door-shadow.right{ left:-10vw; } .gap-light{ width:10px; filter: blur(12px);} }
 </style>
 </head>
-
 <body>
 
 <div class="hero" id="hero" aria-hidden="false">
@@ -214,7 +74,7 @@ html,body{
 
 <script>
 (function(){
-/* --- элементы и константы (как в твоей версии) --- */
+/* ---------- элементы и базовые константы ---------- */
 const hero = document.getElementById('hero');
 const leftDoor = document.getElementById('leftDoor');
 const rightDoor = document.getElementById('rightDoor');
@@ -250,36 +110,110 @@ let heroVisible = true;
 let didVibrate = false;
 const clamp = v => Math.max(0, Math.min(1, v));
 
-/* slider snap state */
+/* --------- slider snap state & scroll control --------- */
 const slides = Array.from(document.querySelectorAll('.slide'));
 let currentSlide = 0;
-let isScrollingTo = false;
-let wheelLock = false;
-let isSliderPointer = false;
+let isScrollingTo = false;        // programmatic smooth scroll running
+let scrollAnim = null;           // {id, cancel, startTop, targetTop}
+let wheelLock = false;           // block wheel while animating
+let isSliderPointer = false;     // user is touching/dragging slider area
 let startSliderY = 0;
 let startSliderTime = 0;
 
-/* helper scroll to index (locks until animation ends) */
-function scrollToIndex(i, smooth = true){
-  i = Math.max(0, Math.min(slides.length - 1, i));
-  currentSlide = i;
-  isScrollingTo = true;
-  // ensure integer pixels
-  const target = Math.round(i * slider.clientHeight);
-  slider.scrollTo({ top: target, behavior: smooth ? 'smooth' : 'auto' });
-  // release lock after a bit (slightly longer than CSS animation)
-  clearTimeout(scrollToIndex._t);
-  scrollToIndex._t = setTimeout(()=>{ isScrollingTo = false; wheelLock = false; }, 480);
+/* helper: immediate cancel of any programmatic scroll */
+function cancelProgrammaticScroll(){
+  if(scrollAnim && scrollAnim.cancel){
+    scrollAnim.cancel();
+    scrollAnim = null;
+  }
+  isScrollingTo = false;
+  wheelLock = false;
+  // restore native scrolling
+  slider.style.overflowY = 'auto';
 }
 
-/* update currentSlide on natural scroll (unless we're programmatically scrolling) */
+/* smooth scroll to index using RAF (cancelable) */
+function smoothScrollToIndex(index, duration = 420){
+  index = Math.max(0, Math.min(slides.length - 1, index));
+  // if already at index, just snap
+  const targetTop = Math.round(index * slider.clientHeight);
+  if(Math.abs(slider.scrollTop - targetTop) < 1){
+    currentSlide = index;
+    return Promise.resolve();
+  }
+
+  // cancel previous
+  cancelProgrammaticScroll();
+
+  isScrollingTo = true;
+  wheelLock = true;
+  currentSlide = index;
+
+  // temporarily disable native inertia by hiding overflow (prevents browser fling summation)
+  slider.style.overflowY = 'hidden';
+
+  const startTop = slider.scrollTop;
+  const start = performance.now();
+  const ease = t => 1 - Math.pow(1 - t, 3); // easeOutCubic
+
+  let rafHandle = null;
+  let cancelled = false;
+
+  function frame(now){
+    if(cancelled) return;
+    const t = Math.min(1, (now - start) / duration);
+    const v = ease(t);
+    const top = Math.round(startTop + (targetTop - startTop) * v);
+    slider.scrollTop = top;
+    if(t < 1){
+      rafHandle = requestAnimationFrame(frame);
+    } else {
+      // finalize
+      slider.scrollTop = targetTop;
+      // small delay to ensure browser paints/settles, then re-enable native scroll
+      setTimeout(()=>{
+        if(!cancelled){
+          slider.style.overflowY = 'auto';
+          isScrollingTo = false;
+          wheelLock = false;
+        }
+      }, 60);
+    }
+  }
+
+  // store cancel handle
+  scrollAnim = {
+    id: null,
+    cancel: ()=>{
+      cancelled = true;
+      if(rafHandle) cancelAnimationFrame(rafHandle);
+      slider.style.overflowY = 'auto';
+      isScrollingTo = false;
+      wheelLock = false;
+    }
+  };
+
+  rafHandle = requestAnimationFrame(frame);
+  scrollAnim.id = rafHandle;
+  return new Promise(resolve => {
+    // resolve after animation end
+    setTimeout(()=> resolve(), duration + 80);
+  });
+}
+
+/* utility: clamp index */
+function clampIndex(i){
+  return Math.max(0, Math.min(slides.length - 1, i));
+}
+
+/* update currentSlide on natural scroll (but ignore while programmatic scroll is in progress) */
 slider.addEventListener('scroll', ()=>{
   if(isScrollingTo) return;
   const idx = Math.round(slider.scrollTop / slider.clientHeight);
   if(idx !== currentSlide) currentSlide = idx;
 });
 
-/* block/unblock slider (as before) */
+/* block/unblock slider (used for hero visible state) */
 function blockSlider(){
   slider.style.pointerEvents = 'none';
   slider.style.overflowY = 'hidden';
@@ -300,7 +234,7 @@ function setDraggingState(active){
   else hero.classList.remove('dragging');
 }
 
-/* render (как у тебя) */
+/* ---------- render (same logic) ---------- */
 function render(p){
   progress = clamp(p);
 
@@ -309,10 +243,8 @@ function render(p){
   const tilt = -progress * 6;
   const scaleY = 1 + progress * 0.12;
 
-  leftDoor.style.transform =
-    `translateX(${-shift}vw) rotateY(${-progress * rot}deg) translateZ(${-depth}px) rotateX(${tilt}deg)`;
-  rightDoor.style.transform =
-    `translateX(${shift}vw) rotateY(${progress * rot}deg) translateZ(${-depth}px) rotateX(${tilt}deg)`;
+  leftDoor.style.transform = `translateX(${-shift}vw) rotateY(${-progress * rot}deg) translateZ(${-depth}px) rotateX(${tilt}deg)`;
+  rightDoor.style.transform = `translateX(${shift}vw) rotateY(${progress * rot}deg) translateZ(${-depth}px) rotateX(${tilt}deg)`;
 
   leftPanel.style.transform = `scaleY(${scaleY})`;
   rightPanel.style.transform = `scaleY(${scaleY})`;
@@ -323,7 +255,6 @@ function render(p){
 
   leftShadow.style.opacity = String(Math.max(0, 0.9 - progress * 0.85));
   rightShadow.style.opacity = String(Math.max(0, 0.9 - progress * 0.85));
-
   hint.style.opacity = String(Math.max(0, 1 - progress * 1.6));
 
   const lightStart = 0.12;
@@ -349,13 +280,14 @@ function render(p){
 
   if(progress >= DISABLE_HERO_AT && !didVibrate){
     didVibrate = true;
-    try { navigator.vibrate && navigator.vibrate(8); } catch(e){}
+    try{ navigator.vibrate && navigator.vibrate(8); }catch(e){}
   }
   if(progress < DISABLE_HERO_AT && didVibrate){
     didVibrate = false;
   }
 }
 
+/* scheduleRender using rAF (as before) */
 function scheduleRender(p){
   pendingProgress = clamp(p);
   if(rafId) return;
@@ -365,8 +297,11 @@ function scheduleRender(p){
   });
 }
 
-/* Apple-style easing with small overshoot */
+/* animateTo (opening/closing) unchanged except it cancels programmatic scroll if needed */
 function animateTo(target, duration = 420){
+  // cancel any programmatic slider scroll so they don't fight
+  cancelProgrammaticScroll();
+
   const from = progress;
   const start = performance.now();
   const c1 = 1.70158;
@@ -381,26 +316,30 @@ function animateTo(target, duration = 420){
   requestAnimationFrame(step);
 }
 
-/* Pointer handling for opening/closing (как было) */
+/* ---------- pointer handlers (open/close + slider interactions) ---------- */
 window.addEventListener('pointerdown', function(e){
   if(e.target.closest('.hero') && heroVisible){
+    // opening drag
     isDragging = true; potentialClose = false;
     setDraggingState(true);
     startY = e.clientY; startProgress = progress;
     lastMoveTime = performance.now(); lastMoveY = e.clientY; velocity = 0;
+    // cancel any running programmatic slider scroll to avoid conflicts
+    cancelProgrammaticScroll();
     e.preventDefault && e.preventDefault();
     return;
   }
   if(e.target.closest('#slider') && !heroVisible){
-    // start slider-focused pointer capture
+    // start slider-focused pointer capture:
     isSliderPointer = true;
     startSliderY = e.clientY;
     startSliderTime = performance.now();
-    startProgress = progress;
-    // prevent other handlers from interfering
+    // cancel programmatic scroll so user can control
+    cancelProgrammaticScroll();
+    // capture pointer to slider if available
+    try{ slider.setPointerCapture && slider.setPointerCapture(e.pointerId); }catch(err){}
     e.preventDefault && e.preventDefault();
     e.stopPropagation && e.stopPropagation();
-    slider.setPointerCapture?.(e.pointerId);
     return;
   }
 }, { passive:false });
@@ -420,26 +359,9 @@ window.addEventListener('pointermove', function(e){
     return;
   }
   if(isSliderPointer){
-    // prevent native scroll inertia while pointer active on slider
+    // when user is dragging on slider, prevent native scroll while pointer active to avoid flings
     e.preventDefault && e.preventDefault();
     e.stopPropagation && e.stopPropagation();
-    return;
-  }
-  if(potentialClose){
-    const dy = startProgress - e.clientY;
-    const threshold = 8;
-    if(Math.abs(dy) > threshold){
-      if(dy < 0){
-        isDragging = true; potentialClose = false;
-        setHeroVisible(true);
-        setDraggingState(true);
-        startProgress = progress; startY = e.clientY;
-        lastMoveTime = now; lastMoveY = e.clientY; velocity = 0;
-        e.preventDefault && e.preventDefault();
-      } else {
-        potentialClose = false;
-      }
-    }
     return;
   }
 }, { passive:false });
@@ -454,13 +376,14 @@ window.addEventListener('pointerup', function(e){
     animateTo(target, dur);
   }
   if(isSliderPointer){
-    // handle slider pointer release: compute dy and velocity from startSlider*
+    // compute gesture on slider
     const endY = e.clientY;
     const dy = startSliderY - endY;
     const dt = Math.max(8, performance.now() - startSliderTime);
     const v = dy / dt; // px per ms
-    const thresholdDistance = Math.max(36, window.innerHeight * 0.04); // px
-    const thresholdVelocity = 0.25; // px/ms
+    // thresholds tuned to avoid skip: distance threshold and velocity threshold
+    const thresholdDistance = Math.max(36, window.innerHeight * 0.04);
+    const thresholdVelocity = 0.35; // px/ms
     let targetIndex = currentSlide;
     if(dy > thresholdDistance || v > thresholdVelocity){
       targetIndex = currentSlide + 1;
@@ -470,36 +393,40 @@ window.addEventListener('pointerup', function(e){
       // small move -> snap to nearest
       targetIndex = Math.round(slider.scrollTop / slider.clientHeight);
     }
-    scrollToIndex(targetIndex, true);
-    try{ slider.releasePointerCapture && slider.releasePointerCapture(e.pointerId); }catch(e){}
+    targetIndex = clampIndex(targetIndex);
+    // smooth programmatic scroll to exactly one neighbour at most
+    smoothScrollToIndex(targetIndex, 420);
+    try{ slider.releasePointerCapture && slider.releasePointerCapture(e.pointerId); }catch(err){}
   }
   isDragging = false; potentialClose = false; isSliderPointer = false;
   startY = 0; startProgress = progress; velocity = 0;
   setDraggingState(false);
 }, { passive:true });
 
-/* Wheel behavior when slider active: one wheel gesture = one slide */
+/* wheel: one wheel action -> one slide; ignore while programmatic scroll running */
 window.addEventListener('wheel', function(e){
-  if(heroVisible) return; // leave hero wheel logic intact
+  if(heroVisible) return; // leave hero behaviour
   e.preventDefault();
   if(wheelLock || isScrollingTo) return;
   wheelLock = true;
   const dir = e.deltaY > 0 ? 1 : -1;
-  scrollToIndex(currentSlide + dir, true);
+  const next = clampIndex(currentSlide + dir);
+  smoothScrollToIndex(next, 360).then(()=>{ wheelLock = false; });
 }, { passive:false });
 
-/* Resize: keep scroll aligned */
+/* we already manage scroll updates; ensure correct snap on resize */
 window.addEventListener('resize', function(){
-  // re-scroll to current index to keep snap alignment
-  scrollToIndex(currentSlide, false);
+  // cancel any ongoing programmatic scroll and realign
+  cancelProgrammaticScroll();
+  // ensure scrollTop matches currentSlide * height
+  slider.scrollTop = Math.round(currentSlide * slider.clientHeight);
 });
 
-/* init */
+/* ---------- init ---------- */
 blockSlider();
 render(0);
 window.addEventListener('resize', () => render(progress));
 })();
 </script>
-
 </body>
   </html>
