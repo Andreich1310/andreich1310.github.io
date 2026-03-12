@@ -3,339 +3,307 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Doors — smooth closing</title>
+<title>Doors</title>
+
 <style>
+
 :root{
-  --gap-start:1;    /* начальный зазор в vw */
-  --gap-end:50;
+ --gap-start:.5;
+ --gap-end:50;
 }
 
 html,body{
-  height:100%; margin:0; overflow:hidden; font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial;
+ height:100%;
+ margin:0;
+ overflow:hidden;
+ font-family:system-ui;
 }
 
-/* HERO (над слайдером) */
 .hero{
-  position:fixed; inset:0; display:flex; z-index:100;
-  perspective:1000px;
-  pointer-events:auto; transition:opacity .28s ease;
-  touch-action:none; background:transparent;
+ position:fixed;
+ inset:0;
+ display:flex;
+ perspective:1000px;
+ z-index:100;
+ transition:opacity .35s cubic-bezier(.22,.61,.36,1);
+ touch-action:none;
 }
 
-/* DOOR — отвечает за вращение/смещение/глубину (pivot у шва) */
 .door{
-  width:50%; height:100%; position:relative; overflow:visible;
-  transform-style:preserve-3d; will-change:transform;
-  transition: transform .35s cubic-bezier(.22,.61,.36,1);
-  backface-visibility:hidden;
-  z-index:40;
-  box-shadow: 0 12px 30px rgba(0,0,0,0.06);
+ width:50%;
+ height:100%;
+ position:relative;
+ transform-style:preserve-3d;
+ will-change:transform;
 }
-.left{ transform-origin: right center; }
-.right{ transform-origin: left center; }
 
-/* PANEL — внутри door: содержит img и тень; на него применяем scaleY с origin bottom */
+.left{ transform-origin:right center; }
+.right{ transform-origin:left center; }
+
 .panel{
-  position:absolute; inset:0; transform-style:preserve-3d; will-change:transform;
-  z-index:50; display:block;
-  transition: transform .35s cubic-bezier(.22,.61,.36,1);
+ position:absolute;
+ inset:0;
+ transform-style:preserve-3d;
 }
-.left .panel{ transform-origin: right bottom; }
-.right .panel{ transform-origin: left bottom; }
 
-/* Контур панели */
+.left .panel{ transform-origin:right bottom; }
+.right .panel{ transform-origin:left bottom; }
+
 .panel::before{
-  content:""; position:absolute; inset:0; pointer-events:none; z-index:70;
-  border:1px solid rgba(0,0,0,0.08);
-  box-shadow: 0 1px 0 rgba(255,255,255,0.02) inset;
+ content:"";
+ position:absolute;
+ inset:0;
+ border:1px solid rgba(0,0,0,.08);
+ pointer-events:none;
+ z-index:5;
 }
 
-/* IMG: now 100% width and we use object-position to show halves */
 .panel img{
-  width:100%;
-  height:100%;
-  object-fit:cover;
-  display:block;
-  position:relative;
-  z-index:60;
-  transform-style:preserve-3d; will-change:transform;
+ width:200%;
+ height:100%;
+ object-fit:cover;
+ position:absolute;
+ top:0;
 }
 
-/* ensure left shows left half, right shows right half */
-.left .panel img{ object-position: left center; }
-.right .panel img{ object-position: right center; }
+.left img{ left:0; }
+.right img{ right:0; }
 
-/* tень внутри панели */
 .door-shadow{
-  position:absolute; top:0; bottom:0; width:10vw; pointer-events:none;
-  filter:blur(18px); opacity:.9; z-index:40;
-  transform-style:preserve-3d; transition: opacity .22s linear, transform .22s linear;
-  transform: translateZ(-80px);
+ position:absolute;
+ top:0;
+ bottom:0;
+ width:10vw;
+ filter:blur(18px);
+ opacity:.9;
+ pointer-events:none;
 }
-.door-shadow.left{ right:-6vw; background: linear-gradient(to right, rgba(0,0,0,.72), rgba(0,0,0,.32), transparent); }
-.door-shadow.right{ left:-6vw;  background: linear-gradient(to left, rgba(0,0,0,.72), rgba(0,0,0,.32), transparent); }
 
-/* внутренняя кромка (над всем) */
-.inner-edge{ position:absolute; top:0; bottom:0; width:16px; z-index:90; pointer-events:none; mix-blend-mode:multiply; }
-.left .inner-edge{ right:0; background:linear-gradient(to left, rgba(0,0,0,.46), rgba(0,0,0,.06) 36%, transparent 100%); }
-.right .inner-edge{ left:0;  background:linear-gradient(to right, rgba(0,0,0,.46), rgba(0,0,0,.06) 36%, transparent 100%); }
-
-/* hint */
-.hint{ position:absolute; left:50%; bottom:12vh; transform:translateX(-50%); z-index:110; display:flex; flex-direction:column; align-items:center; gap:8px; pointer-events:none; transition:opacity .18s;}
-.hint svg{ width:28px; height:28px; display:block; animation:bob 1.2s infinite ease-in-out; }
-@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
-.label{ background:rgba(255,255,255,.96); padding:6px 12px; border-radius:999px; box-shadow:0 6px 18px rgba(0,0,0,.08); font-size:13px; }
-
-/* SLIDER под hero */
-.slider{ position:relative; z-index:1; height:100vh; overflow-y:auto; scroll-snap-type:y mandatory; -webkit-overflow-scrolling:touch; pointer-events:auto; }
-.slide{ height:100vh; scroll-snap-align:start; display:flex; align-items:center; justify-content:center; }
-.slide img{ width:100%; height:100%; object-fit:cover; display:block; }
-
-/* small screens tweaks */
-@media (max-width:520px){
-  .door-shadow{ width:18vw; filter:blur(12px); }
-  .inner-edge{ width:12px; }
-  .door-shadow.left{ right:-10vw; }
-  .door-shadow.right{ left:-10vw; }
+.left .door-shadow{
+ right:-6vw;
+ background:linear-gradient(to right,rgba(0,0,0,.7),transparent);
 }
+
+.right .door-shadow{
+ left:-6vw;
+ background:linear-gradient(to left,rgba(0,0,0,.7),transparent);
+}
+
+.slider{
+ position:relative;
+ height:100vh;
+ overflow-y:auto;
+ scroll-snap-type:y mandatory;
+}
+
+.slide{
+ height:100vh;
+ scroll-snap-align:start;
+}
+
+.slide img{
+ width:100%;
+ height:100%;
+ object-fit:cover;
+}
+
 </style>
 </head>
+
 <body>
 
-<div class="hero" id="hero" aria-hidden="false">
-  <div class="door left" id="leftDoor" aria-hidden="true">
-    <div class="panel">
-      <div class="door-shadow left" aria-hidden="true"></div>
-      <img src="Обложка web.svg" alt="">
-      <div class="inner-edge"></div>
-    </div>
-  </div>
+<div class="hero" id="hero">
 
-  <div class="door right" id="rightDoor" aria-hidden="true">
-    <div class="panel">
-      <div class="door-shadow right" aria-hidden="true"></div>
-      <img src="Обложка web.svg" alt="">
-      <div class="inner-edge"></div>
-    </div>
+ <div class="door left" id="leftDoor">
+  <div class="panel">
+   <div class="door-shadow"></div>
+   <img src="Обложка web.svg">
   </div>
+ </div>
 
-  <div class="hint" id="hint">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <polyline points="6 15 12 9 18 15"></polyline>
-    </svg>
-    <div class="label">Потяни вверх</div>
+ <div class="door right" id="rightDoor">
+  <div class="panel">
+   <div class="door-shadow"></div>
+   <img src="Обложка web.svg">
   </div>
+ </div>
+
 </div>
 
-<div class="slider" id="slider" tabindex="0">
-  <section class="slide"><img src="center.svg" alt=""></section>
-  <section class="slide"><img src="Левая web.svg" alt=""></section>
-  <section class="slide"><img src="Правая web.svg" alt=""></section>
+<div class="slider" id="slider">
+
+ <section class="slide">
+  <img src="center.svg">
+ </section>
+
+ <section class="slide">
+  <img src="Левая web.svg">
+ </section>
+
+ <section class="slide">
+  <img src="Правая web.svg">
+ </section>
+
 </div>
 
 <script>
-(function(){
-const hero = document.getElementById('hero');
-const leftDoor = document.getElementById('leftDoor');
-const rightDoor = document.getElementById('rightDoor');
-const leftPanel = leftDoor.querySelector('.panel');
-const rightPanel = rightDoor.querySelector('.panel');
-const leftImg = leftPanel.querySelector('img');
-const rightImg = rightPanel.querySelector('img');
-const leftShadow = leftPanel.querySelector('.door-shadow');
-const rightShadow = rightPanel.querySelector('.door-shadow');
-const hint = document.getElementById('hint');
-const slider = document.getElementById('slider');
 
-const SWIPE_DISTANCE_FACTOR = 0.12;
-const DISABLE_HERO_AT = 0.999;
+const hero = document.getElementById('hero')
+const leftDoor = document.getElementById('leftDoor')
+const rightDoor = document.getElementById('rightDoor')
 
-let progress = 0;
-let isDragging = false;
-let potentialClose = false;
-let startY = 0;
-let startProgress = 0;
-let lastMoveTime = 0;
-let lastMoveY = 0;
-let velocity = 0;
-const clamp = v => Math.max(0, Math.min(1, v));
+const leftPanel = leftDoor.querySelector('.panel')
+const rightPanel = rightDoor.querySelector('.panel')
 
-function blockSlider(){
-  slider.style.pointerEvents = 'none';
-  slider.style.overflowY = 'hidden';
-}
-function unblockSlider(){
-  slider.style.pointerEvents = 'auto';
-  slider.style.overflowY = 'auto';
-}
-blockSlider();
+const slider = document.getElementById('slider')
 
-const initialGap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gap-start')) || 1;
-const maxGap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gap-end')) || 50;
-const rot = 38;
+let progress = 0
+let isDragging = false
+
+let startY = 0
+let startProgress = 0
+
+let lastMoveTime = 0
+let lastMoveY = 0
+let velocity = 0
+
+const clamp = v => Math.max(0,Math.min(1,v))
+
+const gapStart = .5
+const gapEnd = 50
+const rot = 38
 
 function render(p){
-  progress = clamp(p);
-  const shift = initialGap + progress * (maxGap - initialGap);
 
-  // door transforms
-  const doorDepth = progress * 80;
-  const rotateX = -progress * 6; // top opens more
-  const scaleY = 1 + progress * 0.12;
+ progress = clamp(p)
 
-  leftDoor.style.transform = `
-    translateX(${-shift}vw)
-    rotateY(${-progress * rot}deg)
-    translateZ(${-doorDepth}px)
-    rotateX(${rotateX}deg)
-  `;
-  rightDoor.style.transform = `
-    translateX(${shift}vw)
-    rotateY(${progress * rot}deg)
-    translateZ(${-doorDepth}px)
-    rotateX(${rotateX}deg)
-  `;
+ const shift = gapStart + progress*(gapEnd-gapStart)
 
-  // scale panel upwards (origin bottom)
-  leftPanel.style.transform = `scaleY(${scaleY})`;
-  rightPanel.style.transform = `scaleY(${scaleY})`;
+ const depth = progress*80
+ const tilt = -progress*6
+ const scaleY = 1+progress*.12
 
-  // bring images slightly forward in Z only (no translateX)
-  const imgZ = -progress * 18;
-  leftImg.style.transform = `translateZ(${imgZ}px)`;
-  rightImg.style.transform = `translateZ(${imgZ}px)`;
+ leftDoor.style.transform =
+ `translateX(${-shift}vw)
+  rotateY(${-progress*rot}deg)
+  translateZ(${-depth}px)
+  rotateX(${tilt}deg)`
 
-  // shadows
-  leftShadow.style.opacity = String(Math.max(0, 0.9 - progress * 1.05));
-  rightShadow.style.opacity = String(Math.max(0, 0.9 - progress * 1.05));
+ rightDoor.style.transform =
+ `translateX(${shift}vw)
+  rotateY(${progress*rot}deg)
+  translateZ(${-depth}px)
+  rotateX(${tilt}deg)`
 
-  hint.style.opacity = String(Math.max(0, 1 - progress * 1.6));
+ leftPanel.style.transform=`scaleY(${scaleY})`
+ rightPanel.style.transform=`scaleY(${scaleY})`
 
-  if(progress >= DISABLE_HERO_AT){
-    // fade out then hide and enable slider
-    hero.style.pointerEvents = 'none';
-    hero.style.opacity = '0';
-    setTimeout(()=>{
-      hero.style.display = 'none';
-      unblockSlider();
-      hero.setAttribute('aria-hidden','true');
-    }, 280);
-  } else {
-    if(getComputedStyle(hero).display === 'none'){
-      hero.style.display = '';
-    }
-    hero.style.opacity = '1';
-    hero.style.pointerEvents = 'auto';
-    hero.setAttribute('aria-hidden','false');
-    blockSlider();
-  }
+ hero.style.opacity = 1-progress
+
+ if(progress>.98){
+
+  hero.style.pointerEvents="none"
+  slider.style.pointerEvents="auto"
+  slider.style.overflowY="auto"
+
+ }else{
+
+  hero.style.pointerEvents="auto"
+  slider.style.pointerEvents="none"
+  slider.style.overflowY="hidden"
+
+ }
+
 }
 
-function animateTo(target, duration = 360){
-  const from = progress;
-  const start = performance.now();
-  function step(now){
-    const t = Math.min(1, (now - start) / duration);
-    const eased = 1 - Math.pow(1 - t, 3);
-    render(from + (target - from) * eased);
-    if(t < 1) requestAnimationFrame(step);
-    else {
-      render(target);
-      if(target < 1){
-        hero.style.display = '';
-        hero.style.opacity = '1';
-        hero.style.pointerEvents = 'auto';
-        hero.setAttribute('aria-hidden','false');
-        blockSlider();
-      }
-    }
-  }
-  requestAnimationFrame(step);
+function animateTo(target){
+
+ const from = progress
+
+ const start = performance.now()
+
+ function frame(now){
+
+  let t = (now-start)/420
+  if(t>1)t=1
+
+  /* Apple-like easing */
+  const ease = 1-Math.pow(1-t,4)
+
+  render(from+(target-from)*ease)
+
+  if(t<1)requestAnimationFrame(frame)
+
+ }
+
+ requestAnimationFrame(frame)
+
 }
 
-/* Pointer handling */
-window.addEventListener('pointerdown', function(e){
-  if(e.target.closest('.hero') && getComputedStyle(hero).pointerEvents !== 'none'){
-    isDragging = true; potentialClose = false;
-    startY = e.clientY; startProgress = progress;
-    lastMoveTime = performance.now(); lastMoveY = e.clientY; velocity = 0;
-    e.preventDefault && e.preventDefault();
-    return;
-  }
-  if(e.target.closest('#slider') && progress >= DISABLE_HERO_AT){
-    if(slider.scrollTop <= 2){
-      potentialClose = true;
-      startY = e.clientY; startProgress = progress;
-      lastMoveTime = performance.now(); lastMoveY = e.clientY; velocity = 0;
-    } else {
-      potentialClose = false;
-    }
-    return;
-  }
-}, { passive:false });
+window.addEventListener("pointerdown",e=>{
 
-window.addEventListener('pointermove', function(e){
-  const now = performance.now();
-  if(isDragging){
-    const dy = startY - e.clientY;
-    const swipeDistance = window.innerHeight * SWIPE_DISTANCE_FACTOR;
-    const deltaProgress = dy / swipeDistance;
-    render(startProgress + deltaProgress);
-    const dt = Math.max(8, now - lastMoveTime);
-    const v = (lastMoveY - e.clientY) / dt;
-    velocity = velocity * 0.6 + v * 0.4;
-    lastMoveTime = now; lastMoveY = e.clientY;
-    e.preventDefault && e.preventDefault();
-    return;
-  }
-  if(potentialClose){
-    const dy = startY - e.clientY;
-    const threshold = 8;
-    if(Math.abs(dy) > threshold){
-      if(dy < 0){
-        isDragging = true; potentialClose = false;
-        hero.style.pointerEvents = 'auto';
-        startProgress = progress; startY = e.clientY;
-        lastMoveTime = now; lastMoveY = e.clientY; velocity = 0;
-        e.preventDefault && e.preventDefault();
-      } else {
-        potentialClose = false;
-      }
-    }
-    return;
-  }
-}, { passive:false });
+ isDragging=true
+ startY=e.clientY
+ startProgress=progress
 
-window.addEventListener('pointerup', function(){
-  if(isDragging){
-    const projectionMs = 180;
-    const projected = clamp(progress + velocity * projectionMs / (window.innerHeight * SWIPE_DISTANCE_FACTOR));
-    const target = (projected > 0.5) ? 1 : 0;
-    const dist = Math.abs(target - progress);
-    const dur = Math.min(700, Math.max(180, 280 + dist * 480));
-    animateTo(target, dur);
-  }
-  isDragging = false; potentialClose = false; startY = 0; startProgress = progress; velocity = 0;
-}, { passive:true });
+ lastMoveTime=performance.now()
+ lastMoveY=e.clientY
+ velocity=0
 
-let wheelTimer = null;
-window.addEventListener('wheel', function(e){
-  if(getComputedStyle(hero).pointerEvents === 'none') return;
-  e.preventDefault();
-  const sensitivity = 0.003;
-  render(progress + e.deltaY * sensitivity);
-  if(wheelTimer) clearTimeout(wheelTimer);
-  wheelTimer = setTimeout(()=>{ wheelTimer = null; const target = (progress > 0.5) ? 1 : 0; animateTo(target, 360); }, 110);
-}, { passive:false });
+})
 
-window.addEventListener('keydown', function(e){
-  if(e.key === 'Escape') animateTo(0);
-  if(e.key === 'Enter' || e.key === ' ') animateTo(progress > 0.5 ? 0 : 1);
-});
+window.addEventListener("pointermove",e=>{
 
-render(0);
-window.addEventListener('resize', ()=>render(progress));
-})();
+ if(!isDragging)return
+
+ const dy = startY-e.clientY
+
+ const swipe = window.innerHeight*.12
+
+ const delta = dy/swipe
+
+ render(startProgress+delta)
+
+ const now=performance.now()
+
+ const dt=Math.max(8,now-lastMoveTime)
+
+ const v=(lastMoveY-e.clientY)/dt
+
+ velocity=velocity*.6+v*.4
+
+ lastMoveTime=now
+ lastMoveY=e.clientY
+
+})
+
+window.addEventListener("pointerup",()=>{
+
+ if(!isDragging)return
+
+ const projected = progress + velocity*.25
+
+ const target = projected>.5 ? 1 : 0
+
+ animateTo(target)
+
+ isDragging=false
+
+})
+
+window.addEventListener("wheel",e=>{
+
+ if(hero.style.pointerEvents==="none")return
+
+ e.preventDefault()
+
+ render(progress+e.deltaY*.003)
+
+})
+
+render(0)
+
 </script>
+
 </body>
-  </html>
+</html>
