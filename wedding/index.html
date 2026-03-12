@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Doors — shadow follows door</title>
+<title>Doors — shadow follows door (fixed)</title>
 <style>
 :root{ --gap-start:2; --gap-end:50; }
 html,body{height:100%;margin:0;overflow:hidden;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
@@ -19,39 +19,47 @@ html,body{height:100%;margin:0;overflow:hidden;font-family:system-ui,-apple-syst
 
 /* двери */
 .door{
-  width:50%; height:100%; position:relative; /* overflow visible чтобы тень не обрезалась */
-  overflow:visible;
-  transform-style:preserve-3d; will-change:transform;
+  width:50%; height:100%; position:relative;
+  overflow:visible;                     /* чтобы тень/поворот не обрезались */
+  transform-style:preserve-3d;          /* важная часть 3D-слоёв */
+  will-change:transform;
   transition: transform .38s cubic-bezier(.22,.61,.36,1);
   backface-visibility:hidden;
-  z-index:30; /* двери выше тени и выше слайдера */
+  z-index:30; /* двери выше слайдера */
   box-shadow: 0 12px 30px rgba(0,0,0,0.06);
 }
+
+/* картинка двери — должна быть перед тенью в 3D */
 .door img{
   width:100%; height:100%; object-fit:cover; display:block;
-  transition: transform .38s cubic-bezier(.22,.61,.36,1); will-change:transform;
-  position:relative; z-index:40; /* контент двери над тенью внутри неё */
+  transition: transform .38s cubic-bezier(.22,.61,.36,1);
+  will-change:transform;
+  position:relative; z-index:40;           /* визуально выше тени */
+  transform-style:preserve-3d;
 }
+
+/* origin для поворота */
 .left{ transform-origin:right center; } .right{ transform-origin:left center; }
 .left img{ object-position:right center; } .right img{ object-position:left center; }
 
-/* тень внутри двери — теперь внутри .door, поэтому будет следовать за transform двери */
+/* Тень внутри двери — следует за transform двери.
+   Ключ: даём тени translateZ с отрицательной величиной, чтобы она была "дальше" по оси Z (то есть позади картинки). */
 .door-shadow{
   position:absolute; top:0; bottom:0;
   width:10vw; pointer-events:none;
   filter:blur(18px);
   opacity:.9;
-  z-index:10; /* внутри двери: ниже изображения (z-index:40 у img), но дверь (z-index:30) над слайдером (z-index:1) */
+  z-index:10; /* внутри двери — ниже img (z-index:40) */
   transition: opacity .22s linear, transform .22s linear;
   will-change: opacity, transform;
+  transform-style:preserve-3d;
+  /* фиксированное смещение по Z, чтобы тень всегда оставалась за изображением */
+  transform: translateZ(-60px);
 }
-/* расположение тени относительно панели двери (подкручивай right/left для точного попадания в зазор) */
-.door-shadow.left{ right: -6vw; /* смещаем наружу, чтобы тень падала на слайд */ 
-  background: linear-gradient(to right, rgba(0,0,0,.72), rgba(0,0,0,.32), transparent);
-}
-.door-shadow.right{ left: -6vw;
-  background: linear-gradient(to left, rgba(0,0,0,.72), rgba(0,0,0,.32), transparent);
-}
+
+/* положение тени относительно панели двери (подкрутить при необходимости) */
+.door-shadow.left{ right: -6vw; background: linear-gradient(to right, rgba(0,0,0,.72), rgba(0,0,0,.32), transparent); }
+.door-shadow.right{ left: -6vw; background: linear-gradient(to left, rgba(0,0,0,.72), rgba(0,0,0,.32), transparent); }
 
 /* тонкая внутренняя кромка (над тенью и над изображением) */
 .inner-edge{ position:absolute; top:0; bottom:0; width:16px; z-index:50; pointer-events:none; mix-blend-mode:multiply; }
@@ -83,7 +91,7 @@ html,body{height:100%;margin:0;overflow:hidden;font-family:system-ui,-apple-syst
 <div class="hero" id="hero" aria-hidden="false">
 
   <div class="door left" id="leftDoor" aria-hidden="true">
-    <!-- тень снова внутри двери — она будет следовать за transform двери -->
+    <!-- тень внутри двери, теперь с translateZ(-60px) -->
     <div class="door-shadow left" aria-hidden="true"></div>
     <img src="Обложка web.svg" alt="">
     <div class="inner-edge"></div>
@@ -139,13 +147,13 @@ function render(p){
   leftDoor.style.transform = `translateX(${-shift}vw) rotateY(${-progress*rot}deg)`;
   rightDoor.style.transform = `translateX(${shift}vw) rotateY(${progress*rot}deg)`;
 
-  // слегка масштабируем картинку для глубины
+  // слегка масштабируем картинку для глубины — картинка остаётся ближе, чем тень
   const imgScale = 1 + progress*0.02;
   leftDoor.querySelector('img').style.transform = `translateZ(${-progress*20}px) scale(${imgScale})`;
   rightDoor.querySelector('img').style.transform = `translateZ(${-progress*20}px) scale(${imgScale})`;
 
-  // тень внутри двери: она следует за дверью автоматически (так как внутри .door),
-  // управляем только её непрозрачностью
+  // тени внутри двери: они следуют за transform двери автоматически (т.к. внутри),
+  // но находятся глубже по оси Z (translateZ(-60px) в CSS) — поэтому всегда остаются "за" картинкой.
   const leftShadow = leftDoor.querySelector('.door-shadow');
   const rightShadow = rightDoor.querySelector('.door-shadow');
   leftShadow.style.opacity = String(Math.max(0, 0.9 - progress*1.05));
