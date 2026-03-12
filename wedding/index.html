@@ -1,389 +1,198 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>3D двери с тенью и инерцией</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Apple-like Doors</title>
+<style>
+html,body{
+  margin:0; height:100%; overflow:hidden;
+  font-family:system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+}
 
-  <style>
-    :root {
-      --initial-gap: 2;
-      --max-gap: 50;
-    }
+/* ===== HERO (doors overlay) ===== */
+.hero{
+  position:fixed; inset:0; display:flex; z-index:40;
+  perspective:1800px;
+  pointer-events:auto;
+  transition:opacity .35s ease;
+}
 
-    html, body {
-      margin: 0;
-      height: 100%;
-      overflow: hidden;
-      font-family: system-ui, sans-serif;
-    }
+/* Doors */
+.door{
+  width:50%; height:100%; position:relative; overflow:hidden;
+  transform-style:preserve-3d;
+  will-change: transform;
+  transition: transform .45s cubic-bezier(.22,.61,.36,1);
+  backface-visibility:hidden;
+}
+.door img{
+  width:100%; height:100%; object-fit:cover; display:block;
+  will-change: transform;
+  transform-origin:center;
+  transition: transform .45s cubic-bezier(.22,.61,.36,1);
+}
+.left{ transform-origin:right center; }
+.right{ transform-origin:left center; }
+.left img{ object-position:right center; }
+.right img{ object-position:left center; }
 
-    /* HERO (overlay with doors) */
-    .hero {
-      position: fixed;
-      inset: 0;
-      display: flex;
-      z-index: 40;
-      perspective: 1800px;
-      pointer-events: auto;
-      transition: opacity .35s ease;
-    }
+/* Inner edge highlight */
+.inner-edge{
+  position:absolute; top:0; bottom:0;
+  width:18px; pointer-events:none; z-index:8;
+  mix-blend-mode:multiply;
+}
+.left .inner-edge{
+  right:0; background: linear-gradient(to left, rgba(0,0,0,.45), rgba(0,0,0,.08) 40%, transparent 100%);
+}
+.right .inner-edge{
+  left:0; background: linear-gradient(to right, rgba(0,0,0,.45), rgba(0,0,0,.08) 40%, transparent 100%);
+}
 
-    /* Doors */
-    .door {
-      width: 50%;
-      height: 100%;
-      position: relative;
-      overflow: hidden;
-      transform-style: preserve-3d;
-      will-change: transform;
-      transition: transform .45s cubic-bezier(.22,.61,.36,1);
-    }
+/* Door shadows (soft shadows for each door) */
+.door-shadow{
+  position:absolute; top:0; bottom:0; width:8vw;
+  pointer-events:none; z-index:5;
+  filter:blur(22px); opacity:.9;
+}
+.door-shadow.left{
+  right:-2vw;
+  background:linear-gradient(to right, rgba(0,0,0,.7), rgba(0,0,0,.3), transparent);
+}
+.door-shadow.right{
+  left:-2vw;
+  background:linear-gradient(to left, rgba(0,0,0,.7), rgba(0,0,0,.3), transparent);
+}
 
-    .door img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
+/* Hint arrow */
+.hint{
+  position:absolute; left:50%; bottom:12vh; transform:translateX(-50%);
+  z-index:50; display:flex; flex-direction:column; align-items:center; gap:8px;
+  pointer-events:none; transition:opacity .18s;
+}
+.hint svg{ width:28px; height:28px; display:block; animation:bob 1.2s infinite ease-in-out; }
+@keyframes bob{ 0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)} }
+.label{
+  background:rgba(255,255,255,.96);
+  padding:6px 12px; border-radius:999px;
+  box-shadow:0 6px 18px rgba(0,0,0,.08); font-size:13px;
+}
 
-    .left { transform-origin: right center; }
-    .right { transform-origin: left center; }
-    .left img { object-position: right center; }
-    .right img { object-position: left center; }
-
-    /* Inner thin edge highlight */
-    .inner-edge {
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      width: 18px;
-      pointer-events: none;
-      z-index: 8;
-      mix-blend-mode: multiply;
-    }
-
-    .left .inner-edge {
-      right: 0;
-      background: linear-gradient(to left, rgba(0, 0, 0, .45), rgba(0, 0, 0, .08) 40%, transparent 100%);
-    }
-
-    .right .inner-edge {
-      left: 0;
-      background: linear-gradient(to right, rgba(0, 0, 0, .45), rgba(0, 0, 0, .08) 40%, transparent 100%);
-    }
-
-    /* Shadow on each door's edge */
-    .edge-shadow {
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      width: 28px;
-      pointer-events: none;
-      z-index: 7;
-      filter: blur(12px);
-      transition: transform .12s linear, opacity .12s linear;
-    }
-
-    .edge-shadow.left {
-      right: 0;
-      background: linear-gradient(to left, rgba(0, 0, 0, .5), transparent);
-    }
-
-    .edge-shadow.right {
-      left: 0;
-      background: linear-gradient(to right, rgba(0, 0, 0, .5), transparent);
-    }
-
-    /* Central gap shadow */
-    .gap-shadow {
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 4vw;
-      pointer-events: none;
-      z-index: 6;
-      background: radial-gradient(ellipse at center, rgba(0, 0, 0, .85) 0%, rgba(0, 0, 0, .45) 30%, rgba(0, 0, 0, .15) 60%, transparent 100%);
-      filter: blur(18px);
-      transition: width .12s linear, opacity .12s linear, transform .12s linear;
-    }
-
-    /* Hint */
-    .hint {
-      position: absolute;
-      left: 50%;
-      bottom: 12vh;
-      transform: translateX(-50%);
-      z-index: 50;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
-      pointer-events: none;
-      transition: opacity .18s;
-    }
-
-    .hint svg {
-      width: 28px;
-      height: 28px;
-      display: block;
-      animation: bob 1.2s infinite ease-in-out;
-    }
-
-    @keyframes bob {
-      0%, 100% { transform: translateY(0) }
-      50% { transform: translateY(-8px) }
-    }
-
-    .hint .label {
-      background: rgba(255, 255, 255, .96);
-      padding: 6px 12px;
-      border-radius: 999px;
-      box-shadow: 0 6px 18px rgba(0, 0, 0, .08);
-      font-size: 13px;
-    }
-
-    /* Slider */
-    .slider {
-      height: 100vh;
-      overflow-y: auto;
-      scroll-snap-type: y mandatory;
-      position: relative;
-      z-index: 1;
-    }
-
-    .slide {
-      height: 100vh;
-      scroll-snap-align: start;
-    }
-
-    .slide img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
-
-  </style>
+/* Slider content */
+.slider{
+  position:relative; z-index:1; height:100vh;
+  overflow-y:auto; scroll-snap-type:y mandatory; -webkit-overflow-scrolling:touch;
+}
+.slide{ height:100vh; scroll-snap-align:start; }
+.slide img{ width:100%; height:100%; object-fit:cover; display:block; }
+</style>
 </head>
-
 <body>
 
-<div class="hero" id="hero">
+<!-- Doors overlay -->
+<div class="hero" id="hero" aria-hidden="false">
   <div class="door left" id="leftDoor">
     <img src="Обложка web.svg" alt="">
-    <div class="edge-shadow left" id="leftEdge"></div>
+    <div class="door-shadow left"></div>
     <div class="inner-edge"></div>
   </div>
 
-  <div class="gap-shadow" id="gapShadow"></div>
-
   <div class="door right" id="rightDoor">
     <img src="Обложка web.svg" alt="">
-    <div class="edge-shadow right" id="rightEdge"></div>
+    <div class="door-shadow right"></div>
     <div class="inner-edge"></div>
   </div>
 
   <div class="hint" id="hint">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <polyline points="6 15 12 9 18 15"></polyline>
     </svg>
     <div class="label">Потяни вверх</div>
   </div>
 </div>
 
-<div class="slider" id="slider" tabindex="0" aria-label="Контент">
+<!-- Slider content -->
+<div class="slider" id="slider" tabindex="0">
   <section class="slide"><img src="center.svg" alt=""></section>
   <section class="slide"><img src="Левая web.svg" alt=""></section>
   <section class="slide"><img src="Правая web.svg" alt=""></section>
 </div>
 
 <script>
-/* ==========================
-   Apple-like doors with inertia, parallax and working slider
-   ========================== */
-
 (function(){
-  const hero = document.getElementById('hero');
-  const leftDoor = document.getElementById('leftDoor');
-  const rightDoor = document.getElementById('rightDoor');
-  const gapShadow = document.getElementById('gapShadow');
-  const leftEdgeShadow = document.getElementById('leftEdge');
-  const rightEdgeShadow = document.getElementById('rightEdge');
-  const hint = document.getElementById('hint');
-  const slider = document.getElementById('slider');
+  const hero = document.getElementById("hero");
+  const left = document.getElementById("leftDoor");
+  const right = document.getElementById("rightDoor");
+  const hint = document.getElementById("hint");
 
-  // state
-  let progress = 0;            // 0..1
-  let isDragging = false;
-  let startY = 0;
-  let lastY = 0;
-  let lastT = 0;
-  let velocity = 0;           // px per ms
-  let wheelTimeout = null;
+  let progress = 0; // 0..1
+  let startY = null;
+  let startProgress = 0;
 
-  const OPEN_THRESHOLD = 0.5; // snap threshold
-  const DISABLE_HERO_AT = 0.95; // when to allow interactions to pass to slider
+  function update(p){
+    progress = Math.max(0, Math.min(1, p));
+    const shift = 2 + progress*48;
+    const rot = 38;
 
-  function clamp(v){ return Math.max(0, Math.min(1, v)); }
+    left.style.transform = `translateX(${-shift}vw) rotateY(${-progress*rot}deg)`;
+    right.style.transform = `translateX(${shift}vw) rotateY(${progress*rot}deg)`;
 
-  // visual update based on progress
-  function render(p){
-    progress = clamp(p);
+    hint.style.opacity = Math.max(0, 1-progress*1.5);
 
-    // parameters
-    const gapStart = 2;
-    const gapEnd = 50;
-    const shift = gapStart + progress * (gapEnd - gapStart); // vw
-    const rotateMax = 38; // degrees
-    const zParallax = 40; // px for slight image parallax
-
-    // doors transform (translateX in vw + rotateY)
-    leftDoor.style.transform = `translateX(${-shift}vw) rotateY(${-progress * rotateMax}deg)`;
-    rightDoor.style.transform = `translateX(${shift}vw) rotateY(${progress * rotateMax}deg)`;
-
-    // subtle parallax: move images slightly in Z and scale
-    const imgPar = 1 + progress * 0.02;
-    leftDoor.querySelector('img').style.transform = `translateZ(${ -progress * (zParallax/2) }px) scale(${imgPar})`;
-    rightDoor.querySelector('img').style.transform = `translateZ(${ -progress * (zParallax/2) }px) scale(${imgPar})`;
-
-    // central gap shadow: width grows, becomes lighter when open
-    gapShadow.style.width = (4 + progress * 34) + 'vw';
-    gapShadow.style.opacity = (1 - progress * 0.76).toString();
-    gapShadow.style.transform = `translateX(-50%) translateY(${ -progress * 8 }px)`;
-
-    // edge ambient shadows: move slightly with doors for realism
-    const edgeOffset = Math.min(18, 18 * (1 - progress) + progress * 6);
-    leftEdgeShadow.style.transform = `translateX(${edgeOffset}px)`;
-    rightEdgeShadow.style.transform = `translateX(${-edgeOffset}px)`;
-    leftEdgeShadow.style.opacity = (0.6 * (1 - progress) + 0.15).toString();
-    rightEdgeShadow.style.opacity = (0.6 * (1 - progress) + 0.15).toString();
-
-    // hint vanish
-    hint.style.opacity = Math.max(0, 1 - progress * 1.6);
-
-    // enable/disable hero pointer-events so slider can receive gestures
-    if (progress >= DISABLE_HERO_AT){
-      hero.style.pointerEvents = 'none';
-      hero.style.opacity = '0';
-      hero.setAttribute('aria-hidden','true');
+    if(progress >= 0.97){
+      hero.style.pointerEvents = "none";
+      hero.style.opacity = "0";
     } else {
-      hero.style.pointerEvents = 'auto';
-      hero.style.opacity = '1';
-      hero.setAttribute('aria-hidden','false');
+      hero.style.pointerEvents = "auto";
+      hero.style.opacity = "1";
     }
   }
 
-  // eased animation to target with duration (ms), returns a promise-like (no real promise)
-  function animateTo(target, duration = 360){
-    const start = performance.now();
-    const from = progress;
-    const delta = target - from;
-    if (Math.abs(delta) < 0.001) return;
-    function step(now){
-      const t = Math.min(1, (now - start) / duration);
-      // easeOutCubic
-      const eased = 1 - Math.pow(1 - t, 3);
-      render(from + delta * eased);
-      if (t < 1) requestAnimationFrame(step);
+  function animate(target){
+    const start = progress;
+    const startTime = performance.now();
+    function frame(now){
+      const k = Math.min(1,(now-startTime)/350);
+      const eased = 1-Math.pow(1-k,3);
+      update(start+(target-start)*eased);
+      if(k<1) requestAnimationFrame(frame);
     }
-    requestAnimationFrame(step);
+    requestAnimationFrame(frame);
   }
 
-  // on pointerstart inside hero -> start dragging doors
-  window.addEventListener('pointerdown', (e) => {
-    // only start when hero currently receives pointer events (closed or partially)
-    if (getComputedStyle(hero).pointerEvents === 'none') return;
-
-    if (e.target.closest('.hero')){
-      isDragging = true;
-      startY = lastY = e.clientY;
-      lastT = performance.now();
-      velocity = 0;
-      // stop any running wheel snap timers
-      if (wheelTimeout){ clearTimeout(wheelTimeout); wheelTimeout = null; }
-    }
-  }, {passive:true});
-
-  window.addEventListener('pointermove', (e) => {
-    if (!isDragging) return;
-    const now = performance.now();
-    const dy = startY - e.clientY; // positive when moving up (open)
-    // scale dy to progress (same divisor as wheel logic)
-    const deltaProgress = dy / (window.innerHeight * 0.7);
-    // apply incremental change relative to previous captured start point
-    render(progress + deltaProgress);
-
-    // velocity calc using lastY/lastT to smooth
-    const dt = Math.max(1, now - lastT);
-    const v = (lastY - e.clientY) / dt; // px per ms
-    // simple smoothing
-    velocity = velocity * 0.6 + v * 0.4;
-
-    lastY = e.clientY;
-    lastT = now;
-    // update startY base for next incremental change
+  window.addEventListener("pointerdown", e=>{
+    if(!e.target.closest(".hero")) return;
     startY = e.clientY;
+    startProgress = progress;
   }, {passive:true});
 
-  window.addEventListener('pointerup', () => {
-    if (!isDragging) return;
-    isDragging = false;
-    // project using velocity: predict a bit into future
-    const projectionMs = 220;
-    const projectedProgress = clamp(progress + (velocity * projectionMs) / (window.innerHeight * 0.7));
-    // decide target
-    const target = (projectedProgress > OPEN_THRESHOLD) ? 1 : 0;
-    // duration depends on how far/fast
-    const baseDur = 420;
-    const extra = Math.min(600, Math.abs(target - progress) * 800);
-    const dur = Math.max(200, baseDur + extra - Math.abs(velocity) * 600);
-    animateTo(target, dur);
+  window.addEventListener("pointermove", e=>{
+    if(startY === null) return;
+    const dy = startY - e.clientY;
+    const swipeDistance = window.innerHeight * 0.35; // один свайп = полный прогресс
+    const delta = dy / swipeDistance;
+    update(startProgress + delta);
   }, {passive:true});
 
-  // wheel: allow using wheel/trackpad to open/close doors when hero active.
-  // when hero disabled, wheel should scroll slider (native).
-  window.addEventListener('wheel', (e) => {
-    // if hero is disabled (pointerEvents none) then ignore and let slider scroll
-    if (getComputedStyle(hero).pointerEvents === 'none') return;
-
-    // prevent default scrolling while doors intercept
-    e.preventDefault();
-
-    // deltaY positive -> open (scroll down), negative -> close
-    const speedFactor = 0.0024; // tweak for comfortable sensitivity
-    render(progress + e.deltaY * speedFactor);
-
-    // on wheel end, snap to open/close after short timeout
-    if (wheelTimeout) clearTimeout(wheelTimeout);
-    wheelTimeout = setTimeout(() => {
-      wheelTimeout = null;
-      const target = (progress > OPEN_THRESHOLD) ? 1 : 0;
-      // animate with a bit of overshoot feel
-      animateTo(target, 420);
-    }, 120);
-  }, {passive:false});
-
-  // keyboard accessibility: space/enter toggles open/close; arrows also
-  window.addEventListener('keydown', (e) => {
-    if (document.activeElement === slider) { /* allow normal scrolling */ }
-    if (e.key === 'Escape'){ animateTo(0, 360); }
-    if (e.key === 'Enter' || e.key === ' '){
-      // toggle
-      animateTo(progress > 0.5 ? 0 : 1, 420);
+  window.addEventListener("pointerup", ()=>{
+    if(progress > 0.5){
+      animate(1);
+    } else {
+      animate(0);
     }
+    startY = null;
   });
 
-  // initial render
-  render(0);
+  // wheel support
+  window.addEventListener("wheel", e=>{
+    if(hero.style.pointerEvents==="none") return;
+    e.preventDefault();
+    update(progress + e.deltaY*0.003);
+  }, {passive:false});
 
-  /* Optional: on resize keep things consistent */
-  window.addEventListener('resize', ()=> { render(progress); });
-
+  update(0);
 })();
 </script>
-
 </body>
-  </html>
+</html>
