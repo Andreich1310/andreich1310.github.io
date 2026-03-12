@@ -1,148 +1,138 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <title>Исправление створок с 3D — обновлено</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-
+  <meta charset="utf-8" />
+  <title>Двери — тень в зазоре, усиленный 3D</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
   :root{
-    --initial-gap-vw: 2;
-    --max-gap-vw: 50;
-    --anim-duration: 300ms;
+    --initial-gap-vw: 2;   /* смещение одной створки при закрытом состоянии (vw) */
+    --max-gap-vw: 50;      /* смещение одной створки при полном открытии (vw) */
+    --p: 0;                /* прогресс 0..1 (заполняется из JS) */
+    --gap-w: 0px;          /* ширина зазора в px (заполняется из JS) */
   }
-  html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial;}
 
-  /* ===== Двери (hero) ===== */
+  html,body{height:100%;margin:0;overflow:hidden;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;}
+
+  /* HERO (обложка) */
   .hero{
     position:fixed; inset:0; z-index:50;
     display:flex; pointer-events:auto; touch-action:none;
-    background:transparent; overflow:visible;
-    perspective:1200px; /* перспектива для 3D */
+    overflow:visible; perspective:1200px;
     -webkit-font-smoothing:antialiased;
   }
   .door{
-    position:relative;
-    width:50%;
-    height:100%;
-    overflow:hidden;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    transform-style:preserve-3d;
-    transition:transform 0.25s ease-out;
+    position:relative; width:50%; height:100%;
+    overflow:hidden; display:flex; align-items:center; justify-content:center;
+    transform-style:preserve-3d; transition:transform .28s ease-out;
+    will-change:transform;
     -webkit-user-select:none; user-select:none;
     backface-visibility:hidden;
-    will-change:transform;
   }
 
-  /* Вращаем вокруг внутренней кромки (правильный hinge) */
+  /* ось вращения — внутри шва */
   .door.left{ transform-origin: right center; }
   .door.right{ transform-origin: left center; }
 
   .door img{
-    position:relative;
-    z-index:1; /* ниже внутренних кромок и центральной тени */
-    width:100%; height:100%;
-    object-fit:cover; display:block;
+    position:relative; z-index:1;
+    width:100%; height:100%; object-fit:cover; display:block;
     -webkit-user-drag:none; user-drag:none;
   }
-  .door.left img{ object-position: right center; }
-  .door.right img{ object-position: left center; }
 
-  /* Внутренняя кромка (тонкая тень вдоль шва) */
+  /* лёгкий градиент/затенение на лицевой стороне створки —
+     интенсивность = calc(var(--p) * X) */
+  .door::before{
+    content:""; position:absolute; inset:0; z-index:5; pointer-events:none;
+    transition:background .08s linear, opacity .08s linear;
+  }
+  .door.left::before{
+    background: linear-gradient(to left,
+      rgba(0,0,0, calc(var(--p) * 0.48) ),
+      rgba(0,0,0, calc(var(--p) * 0.08) ) 38%,
+      transparent 60%);
+  }
+  .door.right::before{
+    background: linear-gradient(to right,
+      rgba(0,0,0, calc(var(--p) * 0.48) ),
+      rgba(0,0,0, calc(var(--p) * 0.08) ) 38%,
+      transparent 60%);
+  }
+
+  /* внутренняя кромка (тонкая подсветка/тень вдоль шва) — поверх лицевой тени */
   .inner-edge{
-    position:absolute; top:0; bottom:0;
-    width:12px; pointer-events:none;
-    z-index:6; /* поверх изображения */
-    mix-blend-mode:multiply;
-    transition:opacity .18s;
+    position:absolute; top:0; bottom:0; width:12px; pointer-events:none;
+    z-index:8; mix-blend-mode:multiply; transition:opacity .12s;
   }
   .left .inner-edge{
     right:0;
-    background: linear-gradient(to left, rgba(0,0,0,0.28), rgba(0,0,0,0.06) 36%, transparent 100%);
-    box-shadow: inset -2px 0 8px rgba(0,0,0,0.08);
+    background: linear-gradient(to left, rgba(0,0,0,0.32), rgba(0,0,0,0.06) 40%, transparent 100%);
+    box-shadow: inset -2px 0 10px rgba(0,0,0,0.09);
   }
   .right .inner-edge{
     left:0;
-    background: linear-gradient(to right, rgba(0,0,0,0.28), rgba(0,0,0,0.06) 36%, transparent 100%);
-    box-shadow: inset 2px 0 8px rgba(0,0,0,0.08);
+    background: linear-gradient(to right, rgba(0,0,0,0.32), rgba(0,0,0,0.06) 40%, transparent 100%);
+    box-shadow: inset 2px 0 10px rgba(0,0,0,0.09);
   }
 
-  /* Центровая "отбрасываемая" тень, видимая над контентом под створками */
-  .cast-shadow{
+  /* GAP: тень находится непосредственно в зазоре между створками */
+  .gap{
     position:absolute;
-    left:0; right:0;
-    bottom:0;
-    height:36vh; /* область, куда будет падать тень */
+    top:0; bottom:0;
+    left:50%; transform:translateX(-50%);
+    width:var(--gap-w);
     pointer-events:none;
-    z-index:2; /* между изображением (z:1) и inner-edge (z:6) */
-    background: linear-gradient(to top,
-      rgba(0,0,0,0.45) 0%,
-      rgba(0,0,0,0.22) 20%,
-      rgba(0,0,0,0.08) 40%,
-      transparent 100%);
-    opacity:0.6;
-    transition:opacity .18s, transform .18s;
-    mask-image: linear-gradient(to top, black 0%, transparent 90%); /* мягкое исчезание */
-  }
-
-  /* Подсказка (стрелка и текст) — вертикальный стек через flex */
-  .hint{
-    position:absolute;
-    left:50%; bottom:12vh;
-    transform:translateX(-50%);
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    gap:8px;
-    pointer-events:none;
-    opacity:1;
-    transition:opacity 0.25s, transform 0.25s;
-    z-index:70;
-    color:#222;
-    font-weight:500;
-  }
-  .hint svg{
-    width:28px; height:28px;
-    display:block; /* гарантирует свою строку */
-    animation:bob 1.2s infinite ease-in-out;
-  }
-  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
-  .hint .label{
-    background: rgba(255,255,255,0.94);
-    padding:6px 10px;
-    border-radius:999px;
-    box-shadow:0 4px 14px rgba(0,0,0,0.06);
-    font-size:13px;
+    z-index:4; /* ниже inner-edge (8), выше фон(1) */
+    transition:width .06s linear, opacity .06s linear, transform .06s linear;
     display:block;
+    overflow:visible;
   }
+  .gap::before{
+    content:""; position:absolute; inset:0;
+    /* плотная тёмная сердцевина, мягкие края */
+    background: linear-gradient(90deg,
+      rgba(0,0,0,0.95) 0%,
+      rgba(10,10,10,0.95) 10%,
+      rgba(20,20,20,0.86) 45%,
+      rgba(20,20,20,0.86) 55%,
+      rgba(10,10,10,0.95) 90%,
+      rgba(0,0,0,0.95) 100%);
+    box-shadow: 0 0 60px 18px rgba(0,0,0,0.45) inset;
+    border-radius:2px;
+    opacity: calc( 1 - var(--p) ); /* тень чуть уходит при полном открытии */
+    transform: translateZ(1px);
+  }
+
+  /* подсказка (стрелка+текст) */
+  .hint{
+    position:absolute; left:50%; bottom:12vh; transform:translateX(-50%);
+    display:flex; flex-direction:column; align-items:center; gap:8px;
+    pointer-events:none; z-index:70; transition:opacity .2s, transform .2s;
+  }
+  .hint svg{ width:28px; height:28px; display:block; animation:bob 1.2s infinite ease-in-out; }
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+  .hint .label{ background:rgba(255,255,255,0.95); padding:6px 10px; border-radius:999px; box-shadow:0 6px 18px rgba(0,0,0,0.08); font-size:13px; }
+
   .hint.used{ opacity:0; transform:translateX(-50%) translateY(8px); pointer-events:none; }
 
-  /* ===== Скроллер (slider) ===== */
-  .slider{
-    position:relative; z-index:1;
-    height:100dvh; overflow-y:auto;
-    scroll-snap-type:y mandatory; -webkit-overflow-scrolling:touch;
-  }
+  /* скроллер (контент) */
+  .slider{ position:relative; z-index:1; height:100dvh; overflow-y:auto; scroll-snap-type:y mandatory; -webkit-overflow-scrolling:touch; }
   .slide{ height:100dvh; scroll-snap-align:start; display:flex; justify-content:center; align-items:center; }
   .slide img{ width:100%; height:100%; object-fit:cover; display:block; }
 
-  /* Когда двери полностью открыты, скрываем слой */
   .hero.hidden{ display:none; }
   </style>
 </head>
 <body>
 
-<!-- Двери -->
 <div class="hero" id="hero" aria-label="Обложка — потяните вверх, чтобы открыть">
   <div class="door left" aria-hidden="true">
     <img src="Обложка web.svg" alt="">
     <div class="inner-edge"></div>
   </div>
 
-  <!-- центральная отбрасываемая тень под створками (лежит поверх контента, но под inner-edge) -->
-  <div class="cast-shadow" id="castShadow" aria-hidden="true"></div>
+  <!-- gap — тень находится именно в щели -->
+  <div class="gap" id="gap" aria-hidden="true"></div>
 
   <div class="door right" aria-hidden="true">
     <img src="Обложка web.svg" alt="">
@@ -158,17 +148,10 @@
   </div>
 </div>
 
-<!-- Основной слайдер под дверями -->
 <div class="slider" id="slider">
-  <section class="slide" aria-label="Центр">
-    <img src="center.svg" alt="">
-  </section>
-  <section class="slide" aria-label="Левая">
-    <img src="Левая web.svg" alt="">
-  </section>
-  <section class="slide" aria-label="Правая">
-    <img src="Правая web.svg" alt="">
-  </section>
+  <section class="slide" aria-label="Центр"><img src="center.svg" alt=""></section>
+  <section class="slide" aria-label="Левая"><img src="Левая web.svg" alt=""></section>
+  <section class="slide" aria-label="Правая"><img src="Правая web.svg" alt=""></section>
 </div>
 
 <script>
@@ -178,9 +161,16 @@
   const hint = document.getElementById('hint');
   const leftDoor = document.querySelector('.door.left');
   const rightDoor = document.querySelector('.door.right');
-  const castShadow = document.getElementById('castShadow');
+  const gapEl = document.getElementById('gap');
 
-  let startY = null, opened = false;
+  // настройки — легко менять
+  const initialGapVW = 2;   // соответствует --initial-gap-vw
+  const maxGapVW = 50;      // соответствует --max-gap-vw
+  const rotateMax = 28;     // угол поворота (градусы) — увеличьте для более драматичного эффекта
+  const zDepth = 60;        // translateZ в пикселях (объём)
+
+  let startY = null;
+  let opened = false;
   let progress = 0;
 
   function blockSlider(){ slider.style.pointerEvents='none'; slider.style.overflowY='hidden'; }
@@ -189,40 +179,40 @@
 
   function setProgress(p){
     progress = Math.max(0, Math.min(1, p));
-    const initial = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--initial-gap-vw')) || 2;
-    const maxGap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--max-gap-vw')) || 50;
-    const shift = initial + progress * (maxGap - initial);
 
-    const rotateMax = 18; // усиленный угол поворота (было 8)
-    const zDepth = 40;    // пиксели translateZ для эффекта глубины
+    // shift — смещение одной створки в vw (минимум initialGapVW, максимум maxGapVW)
+    const shift = initialGapVW + progress * (maxGapVW - initialGapVW);
 
-    // left opens to left (negative translateX) and rotates around right edge
+    // обновляем CSS-переменные для использования в стилях
+    document.documentElement.style.setProperty('--p', String(progress));
+
+    // рассчитываем ширину зазора в пикселях: две створки по shift vw -> total gap = 2 * shift vw
+    const gapVW = shift * 2; // vw
+    const gapPx = (gapVW / 100) * window.innerWidth;
+    document.documentElement.style.setProperty('--gap-w', `${gapPx}px`);
+
+    // применяем трансформы к створкам: translateX и rotateY + translateZ (чтобы добавить объём)
     leftDoor.style.transform = `
       translateX(${-shift}vw)
-      translateZ(${ -progress *  (zDepth/2) }px)
+      translateZ(${ progress * zDepth }px)
       rotateY(${-progress * rotateMax}deg)
     `;
-    // right opens to right
     rightDoor.style.transform = `
       translateX(${shift}vw)
-      translateZ(${ -progress * (zDepth/2) }px)
+      translateZ(${ progress * zDepth }px)
       rotateY(${progress * rotateMax}deg)
     `;
 
-    // подсказка постепенно исчезает
+    // чуть регулируем opacity подсказки
     hint.style.opacity = String(Math.max(0, 1 - progress * 1.6));
 
-    // управляем видимостью и интенсивностью "отбрасываемой" тени
-    // когда створки почти закрыты (progress ≈ 0) — тень сильнее,
-    // при полном открытии — тень уходит.
-    const shadowOpacity = Math.max(0, 0.6 * (1 - progress)); 
-    castShadow.style.opacity = String(shadowOpacity);
-    // лёгкое смещение тени при открытии (параллакс): сдвигаем вверх по мере открытия
-    castShadow.style.transform = `translateY(${ -progress * 12 }px)`;
-
-    // inner-edge можно чуть подсвечивать при открытии (опционально)
-    const innerOpacity = 0.4 + (0.6 * (1 - progress));
+    // inner-edge остаётся сверху; можно регулировать её прозрачность в зависимости от открытия
+    const innerOpacity = 0.38 + (0.62 * (1 - progress));
     document.querySelectorAll('.inner-edge').forEach(el => el.style.opacity = innerOpacity.toString());
+
+    // gap — тень в щели: при закрытом состоянии видно сильнее, при открытом уходит
+    gapEl.style.opacity = String(Math.max(0, 1 - progress * 1.2));
+    gapEl.style.transform = `translateY(${ -progress * 10 }px)`; // лёгкий параллакс
 
     if (progress >= 0.98 && !opened){
       opened = true;
@@ -244,11 +234,10 @@
     requestAnimationFrame(step);
   }
 
-  // pointer events
+  // pointer handlers
   window.addEventListener('pointerdown', e => {
     if (opened) return;
     startY = e.clientY;
-    // скрываем подсказку через класс (не удаляем DOM)
     hint.classList.add('used');
   }, {passive:false});
 
@@ -262,12 +251,12 @@
 
   window.addEventListener('pointerup', e => {
     if (opened) return;
-    if (progress > 0.45) animateTo(1, 240);
+    if (progress > 0.45) animateTo(1, 260);
     else animateTo(0, 200);
     startY = null;
   });
 
-  // колесико/трекпад
+  // wheel
   window.addEventListener('wheel', e => {
     if (opened) return;
     e.preventDefault();
@@ -276,14 +265,17 @@
     if (progress >= 0.98) setProgress(1);
   }, {passive:false});
 
-  // клик по обложке — открываем
-  hero.addEventListener('click', e => {
-    if (!opened) animateTo(1, 220);
-  });
+  // click to open
+  hero.addEventListener('click', e => { if (!opened) animateTo(1, 260); });
 
-  // стартовые значения
-  // при старте добавим небольшую видимость тени (коррекция для случаев, когда hero закрыт)
+  // init
   setProgress(0);
+
+  // если нужно — обновляем gap при ресайзе (чтобы gap в px пересчитался)
+  window.addEventListener('resize', () => {
+    // пересчёт по текущему progress
+    setProgress(progress);
+  });
 })();
 </script>
 </body>
