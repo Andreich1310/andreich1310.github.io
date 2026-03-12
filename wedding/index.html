@@ -42,7 +42,7 @@ html,body{
   position:relative;
   transform-style:preserve-3d;
   will-change:transform;
-  overflow:visible;
+  overflow:hidden;
 }
 
 .left{ transform-origin:right center; }
@@ -54,6 +54,7 @@ html,body{
   transform-style:preserve-3d;
   will-change:transform;
   transition:transform .35s cubic-bezier(.22,.61,.36,1);
+  overflow:hidden;
 }
 
 .left .panel{ transform-origin:right bottom; }
