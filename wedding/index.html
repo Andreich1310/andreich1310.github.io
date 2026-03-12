@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Doors</title>
+<title>Doors — upgraded</title>
 
 <style>
 :root{
@@ -28,12 +28,13 @@ html,body{
   touch-action:none;
 }
 
+/* отключаем переходы при драге — уже был в твоём коде */
 .hero.dragging .door,
 .hero.dragging .panel,
 .hero.dragging .door img,
 .hero.dragging .door-shadow,
 .hero.dragging .hint{
-  transition:none;
+  transition:none !important;
 }
 
 .door{
@@ -48,6 +49,7 @@ html,body{
 .left{ transform-origin:right center; }
 .right{ transform-origin:left center; }
 
+/* panel содержит img, тень и контур; scaleY origin bottom */
 .panel{
   position:absolute;
   inset:0;
@@ -65,7 +67,7 @@ html,body{
   inset:0;
   border:1px solid rgba(0,0,0,.08);
   pointer-events:none;
-  z-index:5;
+  z-index:70;
 }
 
 .panel img{
@@ -74,7 +76,7 @@ html,body{
   object-fit:cover;
   display:block;
   position:relative;
-  z-index:2;
+  z-index:60;            /* достаточно высоко, чтобы быть над gap-light */
   will-change:transform;
   transition:transform .35s cubic-bezier(.22,.61,.36,1);
 }
@@ -82,6 +84,7 @@ html,body{
 .left .panel img{ object-position:left center; }
 .right .panel img{ object-position:right center; }
 
+/* door-shadow (следует за панелью) */
 .door-shadow{
   position:absolute;
   top:0;
@@ -93,6 +96,7 @@ html,body{
   transform-style:preserve-3d;
   transition: opacity .22s linear, transform .22s linear;
   transform: translateZ(-80px);
+  z-index:40; /* под изображением (img z-index:60) */
 }
 .door-shadow.left{
   right:-6vw;
@@ -103,24 +107,26 @@ html,body{
   background:linear-gradient(to left,rgba(0,0,0,.72), rgba(0,0,0,.32), transparent);
 }
 
+/* inner edge */
 .inner-edge{
   position:absolute;
   top:0;
   bottom:0;
   width:16px;
-  z-index:9;
+  z-index:90; /* всегда поверх панелей */
   pointer-events:none;
   mix-blend-mode:multiply;
 }
 .left .inner-edge{ right:0; background:linear-gradient(to left, rgba(0,0,0,.46), rgba(0,0,0,.06) 36%, transparent 100%); }
 .right .inner-edge{ left:0; background:linear-gradient(to right, rgba(0,0,0,.46), rgba(0,0,0,.06) 36%, transparent 100%); }
 
+/* подсказка */
 .hint{
   position:absolute;
   left:50%;
   bottom:12vh;
   transform:translateX(-50%);
-  z-index:50;
+  z-index:120;
   display:flex;
   flex-direction:column;
   align-items:center;
@@ -132,6 +138,23 @@ html,body{
 @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
 .label{ background:rgba(255,255,255,.96); padding:6px 12px; border-radius:999px; box-shadow:0 6px 18px rgba(0,0,0,.08); font-size:13px; }
 
+/* cinematic light in the gap (виден только в щели между панелями) */
+.gap-light{
+  position:absolute;
+  left:50%;
+  top:0;
+  bottom:0;
+  width:6px;
+  transform:translateX(-50%);
+  pointer-events:none;
+  z-index:20; /* ниже изображений, чтобы не закрывать их, но внутри hero */
+  background: linear-gradient(180deg, rgba(255,245,220,0.95), rgba(255,230,160,0.6));
+  filter: blur(18px);
+  opacity:0;
+  transition: opacity .26s linear, width .26s linear;
+}
+
+/* slider */
 .slider{
   position:relative;
   height:100vh;
@@ -151,9 +174,13 @@ html,body{
   object-fit:cover;
 }
 
+/* mobile tweaks */
 @media (max-width:520px){
   .door-shadow{ width:14vw; filter:blur(12px); }
   .inner-edge{ width:12px; }
+  .door-shadow.left{ right:-10vw; }
+  .door-shadow.right{ left:-10vw; }
+  .gap-light{ width:10px; filter: blur(12px); }
 }
 </style>
 </head>
@@ -161,6 +188,9 @@ html,body{
 <body>
 
 <div class="hero" id="hero" aria-hidden="false">
+  <!-- cinematic light between doors -->
+  <div class="gap-light" id="gapLight" aria-hidden="true"></div>
+
   <div class="door left" id="leftDoor">
     <div class="panel">
       <div class="door-shadow left"></div>
@@ -208,13 +238,14 @@ const leftImg = leftDoor.querySelector('img');
 const rightImg = rightDoor.querySelector('img');
 const leftShadow = leftDoor.querySelector('.door-shadow');
 const rightShadow = rightDoor.querySelector('.door-shadow');
+const gapLight = document.getElementById('gapLight');
 const hint = document.getElementById('hint');
 const slider = document.getElementById('slider');
 
 const SWIPE_DISTANCE_FACTOR = 0.12;
 const DISABLE_HERO_AT = 0.98;
-const initialGap = 0.5;
-const maxGap = 50;
+const initialGap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gap-start')) || 0.5;
+const maxGap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gap-end')) || 50;
 const rot = 38;
 const FADE_START = 0.93;
 const FADE_END = 0.98;
@@ -230,6 +261,7 @@ let velocity = 0;
 let rafId = 0;
 let pendingProgress = 0;
 let heroVisible = true;
+let didVibrate = false; // чтобы не дергать вибрацию
 const clamp = v => Math.max(0, Math.min(1, v));
 
 function blockSlider(){
@@ -254,26 +286,49 @@ function setDraggingState(active){
 
 function render(p){
   progress = clamp(p);
+
   const shift = initialGap + progress * (maxGap - initialGap);
   const depth = progress * 80;
   const tilt = -progress * 6;
   const scaleY = 1 + progress * 0.12;
 
+  // doors transform
   leftDoor.style.transform =
     `translateX(${-shift}vw) rotateY(${-progress * rot}deg) translateZ(${-depth}px) rotateX(${tilt}deg)`;
   rightDoor.style.transform =
     `translateX(${shift}vw) rotateY(${progress * rot}deg) translateZ(${-depth}px) rotateX(${tilt}deg)`;
 
+  // panel stretch up
   leftPanel.style.transform = `scaleY(${scaleY})`;
   rightPanel.style.transform = `scaleY(${scaleY})`;
 
+  // images come slightly forward in Z (no X translation)
   const imgZ = -progress * 20;
   leftImg.style.transform = `translateZ(${imgZ}px)`;
   rightImg.style.transform = `translateZ(${imgZ}px)`;
 
+  // shadows
   leftShadow.style.opacity = String(Math.max(0, 0.9 - progress * 0.85));
   rightShadow.style.opacity = String(Math.max(0, 0.9 - progress * 0.85));
+
+  // hint opacity
   hint.style.opacity = String(Math.max(0, 1 - progress * 1.6));
+
+  // cinematic gap-light: start showing after small opening
+  const lightStart = 0.12;
+  const lightEnd = 0.9;
+  if(progress <= lightStart) {
+    gapLight.style.opacity = '0';
+    gapLight.style.width = '6px';
+  } else {
+    const lt = Math.min(1, (progress - lightStart) / (lightEnd - lightStart));
+    gapLight.style.opacity = String(lt * 0.95);
+    // slightly widen the beam as doors open
+    const w = 6 + lt * 18; // px converted to css later (we use px for simplicity)
+    gapLight.style.width = `${w}px`;
+  }
+
+  // fade hero by progress near end (opacity only — don't change display)
   let fade = 1;
   if(progress >= FADE_START){
     const t = Math.min(1, (progress - FADE_START) / (FADE_END - FADE_START));
@@ -281,7 +336,17 @@ function render(p){
   }
   hero.style.opacity = String(Math.max(0, fade));
 
+  // manage heroVisible based on threshold
   setHeroVisible(progress < DISABLE_HERO_AT);
+
+  // vibrate once on full open crossing
+  if(progress >= DISABLE_HERO_AT && !didVibrate){
+    didVibrate = true;
+    try { navigator.vibrate && navigator.vibrate(8); } catch(e){}
+  }
+  if(progress < DISABLE_HERO_AT && didVibrate){
+    didVibrate = false;
+  }
 }
 
 function scheduleRender(p){
@@ -293,18 +358,31 @@ function scheduleRender(p){
   });
 }
 
+/* Apple-style easing with small overshoot */
 function animateTo(target, duration = 420){
   const from = progress;
   const start = performance.now();
+
+  // cubic overshoot (back easeOut)
+  const c1 = 1.70158;
+  const c3 = c1 + 1;
+
   function step(now){
-    const t = Math.min(1, (now - start) / duration);
-    const eased = 1 - Math.pow(1 - t, 4);
+    const tRaw = Math.min(1, (now - start) / duration);
+    // back ease-out giving small overshoot
+    const eased = 1 + c3 * Math.pow(tRaw - 1, 3) + c1 * Math.pow(tRaw - 1, 2);
     render(from + (target - from) * eased);
-    if(t < 1) requestAnimationFrame(step);
+
+    if(tRaw < 1) requestAnimationFrame(step);
+    else {
+      // ensure exact final state
+      render(target);
+    }
   }
   requestAnimationFrame(step);
 }
 
+/* Pointer handling */
 window.addEventListener('pointerdown', function(e){
   if(e.target.closest('.hero') && heroVisible){
     isDragging = true; potentialClose = false;
@@ -365,7 +443,7 @@ window.addEventListener('pointerup', function(){
     const projected = clamp(progress + velocity * projectionMs / (window.innerHeight * SWIPE_DISTANCE_FACTOR));
     const target = (projected > 0.5) ? 1 : 0;
     const dist = Math.abs(target - progress);
-    const dur = Math.min(600, Math.max(180, 280 + dist * 480));
+    const dur = Math.min(700, Math.max(180, 280 + dist * 480));
     animateTo(target, dur);
   }
   isDragging = false; potentialClose = false; startY = 0; startProgress = progress; velocity = 0;
@@ -386,6 +464,7 @@ window.addEventListener('wheel', function(e){
   }, 110);
 }, { passive:false });
 
+/* init */
 blockSlider();
 render(0);
 window.addEventListener('resize', () => render(progress));
@@ -393,4 +472,4 @@ window.addEventListener('resize', () => render(progress));
 </script>
 
 </body>
-</html>
+  </html>
