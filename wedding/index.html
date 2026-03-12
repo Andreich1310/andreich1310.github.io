@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Doors — final</title>
+<title>Doors — corrected halves (left/right)</title>
 <style>
 :root{
-  --gap-start:1;    /* начальный зазор в vw (уменьшил вдвое) */
+  --gap-start:1;    /* начальный зазор в vw */
   --gap-end:50;
 }
 
@@ -34,14 +34,12 @@ html,body{
 .left{ transform-origin: right center; }
 .right{ transform-origin: left center; }
 
-/* PANEL — внутри door: содержит img и тень; на него применяем scaleY с origin сверху/снизу */
+/* PANEL — внутри door: содержит img и тень; на него применяем scaleY с origin bottom */
 .panel{
   position:absolute; inset:0; transform-style:preserve-3d; will-change:transform;
   z-index:50; display:block;
   transition: transform .35s cubic-bezier(.22,.61,.36,1);
 }
-/* В этой версии панель растягивается вверх (origin: bottom) — но ротейтX сделан отрицательно,
-   в результате верхний зазор становится больше. */
 .left .panel{ transform-origin: right bottom; }
 .right .panel{ transform-origin: left bottom; }
 
@@ -52,14 +50,22 @@ html,body{
   box-shadow: 0 1px 0 rgba(255,255,255,0.02) inset;
 }
 
-/* IMG: делаем шире (200%) и сдвигаем, чтобы левая/правая показывали половины.
-   Трансформы комбинируем в JS (translateZ + translateX) */
+/* IMG: now 100% width and we use object-position to show halves */
 .panel img{
-  width:200%; height:100%; object-fit:cover; display:block;
-  position:relative; z-index:80; transform-style:preserve-3d; will-change:transform;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+  position:relative;
+  z-index:60;
+  transform-style:preserve-3d; will-change:transform;
 }
 
-/* тень внутри панели — следует за панелью, лежит позади изображения */
+/* ensure left shows left half, right shows right half */
+.left .panel img{ object-position: left center; }
+.right .panel img{ object-position: right center; }
+
+/* tень внутри панели */
 .door-shadow{
   position:absolute; top:0; bottom:0; width:10vw; pointer-events:none;
   filter:blur(18px); opacity:.9; z-index:40;
@@ -85,7 +91,7 @@ html,body{
 .slide{ height:100vh; scroll-snap-align:start; display:flex; align-items:center; justify-content:center; }
 .slide img{ width:100%; height:100%; object-fit:cover; display:block; }
 
-/* small screens */
+/* small screens tweaks */
 @media (max-width:520px){
   .door-shadow{ width:18vw; filter:blur(12px); }
   .inner-edge{ width:12px; }
@@ -100,7 +106,6 @@ html,body{
   <div class="door left" id="leftDoor" aria-hidden="true">
     <div class="panel">
       <div class="door-shadow left" aria-hidden="true"></div>
-      <!-- img шире (200%) — будем сдвигать в JS: left = 0, right = -50% -->
       <img src="Обложка web.svg" alt="">
       <div class="inner-edge"></div>
     </div>
@@ -143,7 +148,7 @@ const hint = document.getElementById('hint');
 const slider = document.getElementById('slider');
 
 const SWIPE_DISTANCE_FACTOR = 0.12;
-const DISABLE_HERO_AT = 0.999; // позволяем прогресс доходить до 1, блокируем действия потом
+const DISABLE_HERO_AT = 0.999;
 
 let progress = 0;
 let isDragging = false;
@@ -155,7 +160,6 @@ let lastMoveY = 0;
 let velocity = 0;
 const clamp = v => Math.max(0, Math.min(1, v));
 
-/* блокировка слайдера пока двери закрыты */
 function blockSlider(){
   slider.style.pointerEvents = 'none';
   slider.style.overflowY = 'hidden';
@@ -164,26 +168,21 @@ function unblockSlider(){
   slider.style.pointerEvents = 'auto';
   slider.style.overflowY = 'auto';
 }
-
-/* Изначально блокируем слайдер */
 blockSlider();
 
-/* Удобные параметры */
 const initialGap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gap-start')) || 1;
 const maxGap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gap-end')) || 50;
-const rot = 38; // поворот по Y (петли)
+const rot = 38;
 
 function render(p){
   progress = clamp(p);
+  const shift = initialGap + progress * (maxGap - initialGap);
 
-  const shift = initialGap + progress * (maxGap - initialGap); // vw
+  // door transforms
+  const doorDepth = progress * 80;
+  const rotateX = -progress * 6; // top opens more
+  const scaleY = 1 + progress * 0.12;
 
-  // door depth / rotateX (отрицательное — чтобы верхний зазор был больше)
-  const doorDepth = progress * 80;       // px внутренняя грань уходит в глубь
-  const rotateX = -progress * 6;         // отрицательное: верх открывается сильнее
-  const scaleY = 1 + progress * 0.12;    // усиленное растяжение по Y (вдвое)
-
-  // внешняя трансформация дверей (pivot и поворот)
   leftDoor.style.transform = `
     translateX(${-shift}vw)
     rotateY(${-progress * rot}deg)
@@ -197,35 +196,31 @@ function render(p){
     rotateX(${rotateX}deg)
   `;
 
-  // scaleY панели — origin bottom (panel настроен в CSS)
+  // scale panel upwards (origin bottom)
   leftPanel.style.transform = `scaleY(${scaleY})`;
   rightPanel.style.transform = `scaleY(${scaleY})`;
 
-  // img: смещаем влево/вправо, и двигаем по Z чуть вперед, чтобы изображение над тенью
-  const imgZ = -progress * 18; // px
-  leftImg.style.transform = `translateZ(${imgZ}px) translateX(0%)`;    // левая половина
-  rightImg.style.transform = `translateZ(${imgZ}px) translateX(-50%)`; // правая половина
+  // bring images slightly forward in Z only (no translateX)
+  const imgZ = -progress * 18;
+  leftImg.style.transform = `translateZ(${imgZ}px)`;
+  rightImg.style.transform = `translateZ(${imgZ}px)`;
 
-  // корректируем opacity тени
+  // shadows
   leftShadow.style.opacity = String(Math.max(0, 0.9 - progress * 1.05));
   rightShadow.style.opacity = String(Math.max(0, 0.9 - progress * 1.05));
 
-  // подсказка
   hint.style.opacity = String(Math.max(0, 1 - progress * 1.6));
 
-  // при полном открытии — плавно скрываем hero и включаем слайдер
   if(progress >= DISABLE_HERO_AT){
-    // Плавно скрываем
+    // fade out then hide and enable slider
     hero.style.pointerEvents = 'none';
     hero.style.opacity = '0';
-    // через щель времени прячем окончательно и даём управление слайдеру
     setTimeout(()=>{
       hero.style.display = 'none';
       unblockSlider();
       hero.setAttribute('aria-hidden','true');
-    }, 280); // совпадает с transition:opacity
+    }, 280);
   } else {
-    // Если закрываем обратно — показываем hero и блокируем слайдер
     if(getComputedStyle(hero).display === 'none'){
       hero.style.display = '';
     }
@@ -236,7 +231,6 @@ function render(p){
   }
 }
 
-/* Анимация к цели с финальной корректировкой */
 function animateTo(target, duration = 360){
   const from = progress;
   const start = performance.now();
@@ -246,11 +240,8 @@ function animateTo(target, duration = 360){
     render(from + (target - from) * eased);
     if(t < 1) requestAnimationFrame(step);
     else {
-      // гарантируем точное состояние
       render(target);
-      // если целевой = 1, уже обработается в render (скрытие)
       if(target < 1){
-        // если закрыли — удостоверимся, что hero видим и слайдер заблокирован
         hero.style.display = '';
         hero.style.opacity = '1';
         hero.style.pointerEvents = 'auto';
@@ -264,7 +255,6 @@ function animateTo(target, duration = 360){
 
 /* Pointer handling */
 window.addEventListener('pointerdown', function(e){
-  // если клик по hero (пока не скрыт)
   if(e.target.closest('.hero') && getComputedStyle(hero).pointerEvents !== 'none'){
     isDragging = true; potentialClose = false;
     startY = e.clientY; startProgress = progress;
@@ -272,7 +262,6 @@ window.addEventListener('pointerdown', function(e){
     e.preventDefault && e.preventDefault();
     return;
   }
-  // если открыт и пользователь вверху slider — даём шанс закрыть
   if(e.target.closest('#slider') && progress >= DISABLE_HERO_AT){
     if(slider.scrollTop <= 2){
       potentialClose = true;
@@ -329,7 +318,6 @@ window.addEventListener('pointerup', function(){
   isDragging = false; potentialClose = false; startY = 0; startProgress = progress; velocity = 0;
 }, { passive:true });
 
-/* Wheel */
 let wheelTimer = null;
 window.addEventListener('wheel', function(e){
   if(getComputedStyle(hero).pointerEvents === 'none') return;
@@ -340,16 +328,14 @@ window.addEventListener('wheel', function(e){
   wheelTimer = setTimeout(()=>{ wheelTimer = null; const target = (progress > 0.5) ? 1 : 0; animateTo(target, 360); }, 110);
 }, { passive:false });
 
-/* Keyboard shortcuts */
 window.addEventListener('keydown', function(e){
   if(e.key === 'Escape') animateTo(0);
   if(e.key === 'Enter' || e.key === ' ') animateTo(progress > 0.5 ? 0 : 1);
 });
 
-/* init */
 render(0);
 window.addEventListener('resize', ()=>render(progress));
 })();
 </script>
 </body>
-  </html>
+</html>
