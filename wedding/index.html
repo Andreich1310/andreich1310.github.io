@@ -3,67 +3,63 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Doors — shadow cast on slide</title>
+<title>Doors — shadow follows door</title>
 <style>
 :root{ --gap-start:2; --gap-end:50; }
 html,body{height:100%;margin:0;overflow:hidden;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
 
-/* overlay */
+/* hero поверх слайдера */
 .hero{
-  position:fixed; inset:0; display:flex; z-index:100; /* hero над слайдером */
+  position:fixed; inset:0; display:flex; z-index:100;
   perspective:1800px;
   pointer-events:auto; transition:opacity .28s ease;
   touch-action:none;
   background:transparent;
 }
 
-/* Тени должны быть между .slider и .door — минимальный z-index у тени, выше чем у .slider (1) */
-.door-shadow {
-  position:absolute;
-  top:0; bottom:0;
-  width:10vw;
-  pointer-events:none;
-  filter:blur(18px);
-  opacity:.9;
-  z-index:10; /* ниже, чем двери, но выше, чем слайдер (у слайдера z-index:1) */
-  transition: opacity .22s linear, transform .22s linear;
-  will-change:opacity, transform;
-}
-/* расположение теней (они смещены от центра, можно тонко настроить) */
-.door-shadow.left{
-  right: calc(50% - 2vw); /* чуть правее левой половины */
-  background: linear-gradient(to right, rgba(0,0,0,.72), rgba(0,0,0,.32), transparent);
-}
-.door-shadow.right{
-  left: calc(50% - 2vw);
-  background: linear-gradient(to left, rgba(0,0,0,.72), rgba(0,0,0,.32), transparent);
-}
-
-/* двери выше тени */
+/* двери */
 .door{
-  width:50%; height:100%; position:relative; overflow:visible; /* overflow visible, чтобы повороты не обрезались */
+  width:50%; height:100%; position:relative; /* overflow visible чтобы тень не обрезалась */
+  overflow:visible;
   transform-style:preserve-3d; will-change:transform;
   transition: transform .38s cubic-bezier(.22,.61,.36,1);
   backface-visibility:hidden;
-  z-index:20;
-  /* лёгкая тень на самой створке для объёма (не та, что на слайде) */
+  z-index:30; /* двери выше тени и выше слайдера */
   box-shadow: 0 12px 30px rgba(0,0,0,0.06);
 }
 .door img{
   width:100%; height:100%; object-fit:cover; display:block;
   transition: transform .38s cubic-bezier(.22,.61,.36,1); will-change:transform;
-  position:relative; z-index:2;
+  position:relative; z-index:40; /* контент двери над тенью внутри неё */
 }
 .left{ transform-origin:right center; } .right{ transform-origin:left center; }
 .left img{ object-position:right center; } .right img{ object-position:left center; }
 
-/* Внутренняя тонкая кромка у створок (по-прежнему над тенью и над самими створками) */
-.inner-edge{ position:absolute; top:0; bottom:0; width:16px; z-index:30; pointer-events:none; mix-blend-mode:multiply; }
+/* тень внутри двери — теперь внутри .door, поэтому будет следовать за transform двери */
+.door-shadow{
+  position:absolute; top:0; bottom:0;
+  width:10vw; pointer-events:none;
+  filter:blur(18px);
+  opacity:.9;
+  z-index:10; /* внутри двери: ниже изображения (z-index:40 у img), но дверь (z-index:30) над слайдером (z-index:1) */
+  transition: opacity .22s linear, transform .22s linear;
+  will-change: opacity, transform;
+}
+/* расположение тени относительно панели двери (подкручивай right/left для точного попадания в зазор) */
+.door-shadow.left{ right: -6vw; /* смещаем наружу, чтобы тень падала на слайд */ 
+  background: linear-gradient(to right, rgba(0,0,0,.72), rgba(0,0,0,.32), transparent);
+}
+.door-shadow.right{ left: -6vw;
+  background: linear-gradient(to left, rgba(0,0,0,.72), rgba(0,0,0,.32), transparent);
+}
+
+/* тонкая внутренняя кромка (над тенью и над изображением) */
+.inner-edge{ position:absolute; top:0; bottom:0; width:16px; z-index:50; pointer-events:none; mix-blend-mode:multiply; }
 .left .inner-edge{ right:0; background:linear-gradient(to left, rgba(0,0,0,.46), rgba(0,0,0,.06) 36%, transparent 100%); }
 .right .inner-edge{ left:0; background:linear-gradient(to right, rgba(0,0,0,.46), rgba(0,0,0,.06) 36%, transparent 100%); }
 
 /* подсказка поверх всего */
-.hint{ position:absolute; left:50%; bottom:12vh; transform:translateX(-50%); z-index:40; display:flex; flex-direction:column; align-items:center; gap:8px; pointer-events:none; transition:opacity .18s;}
+.hint{ position:absolute; left:50%; bottom:12vh; transform:translateX(-50%); z-index:60; display:flex; flex-direction:column; align-items:center; gap:8px; pointer-events:none; transition:opacity .18s;}
 .hint svg{ width:28px; height:28px; display:block; animation:bob 1.2s infinite ease-in-out; }
 @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
 .label{ background:rgba(255,255,255,.96); padding:6px 12px; border-radius:999px; box-shadow:0 6px 18px rgba(0,0,0,.08); font-size:13px; }
@@ -77,22 +73,24 @@ html,body{height:100%;margin:0;overflow:hidden;font-family:system-ui,-apple-syst
 @media (max-width:520px){
   .door-shadow{ width:18vw; filter:blur(12px); }
   .inner-edge{ width:12px; }
+  .door-shadow.left{ right:-10vw; }
+  .door-shadow.right{ left:-10vw; }
 }
 </style>
 </head>
 <body>
 
 <div class="hero" id="hero" aria-hidden="false">
-  <!-- Тени вынесены отдельно: они под дверями (по z-index), но внутри hero -->
-  <div class="door-shadow left" id="leftShadow" aria-hidden="true"></div>
-  <div class="door-shadow right" id="rightShadow" aria-hidden="true"></div>
 
   <div class="door left" id="leftDoor" aria-hidden="true">
+    <!-- тень снова внутри двери — она будет следовать за transform двери -->
+    <div class="door-shadow left" aria-hidden="true"></div>
     <img src="Обложка web.svg" alt="">
     <div class="inner-edge"></div>
   </div>
 
   <div class="door right" id="rightDoor" aria-hidden="true">
+    <div class="door-shadow right" aria-hidden="true"></div>
     <img src="Обложка web.svg" alt="">
     <div class="inner-edge"></div>
   </div>
@@ -116,8 +114,6 @@ html,body{height:100%;margin:0;overflow:hidden;font-family:system-ui,-apple-syst
 const hero = document.getElementById('hero');
 const leftDoor = document.getElementById('leftDoor');
 const rightDoor = document.getElementById('rightDoor');
-const leftShadow = document.getElementById('leftShadow');
-const rightShadow = document.getElementById('rightShadow');
 const hint = document.getElementById('hint');
 const slider = document.getElementById('slider');
 
@@ -138,23 +134,24 @@ function render(p){
   progress = clamp(p);
   const shift = 2 + progress*(50-2); // vw
   const rot = 38; // угол поворота в градусах
+
+  // двери (перенос + поворот)
   leftDoor.style.transform = `translateX(${-shift}vw) rotateY(${-progress*rot}deg)`;
   rightDoor.style.transform = `translateX(${shift}vw) rotateY(${progress*rot}deg)`;
 
-  // небольшое "вытягивание" фонового изображения для глубины
+  // слегка масштабируем картинку для глубины
   const imgScale = 1 + progress*0.02;
   leftDoor.querySelector('img').style.transform = `translateZ(${-progress*20}px) scale(${imgScale})`;
   rightDoor.querySelector('img').style.transform = `translateZ(${-progress*20}px) scale(${imgScale})`;
 
-  // тени — они под створками (z-index меньше, чем у .door), меняем прозрачность и лёгкое смещение
+  // тень внутри двери: она следует за дверью автоматически (так как внутри .door),
+  // управляем только её непрозрачностью
+  const leftShadow = leftDoor.querySelector('.door-shadow');
+  const rightShadow = rightDoor.querySelector('.door-shadow');
   leftShadow.style.opacity = String(Math.max(0, 0.9 - progress*1.05));
   rightShadow.style.opacity = String(Math.max(0, 0.9 - progress*1.05));
 
-  // дополнительно смещаем тень ближе к центру по мере открытия чтобы лучше падала на слайд
-  const shadowShift = progress * 8; // vw смещение
-  leftShadow.style.transform = `translateX(${shadowShift}vw)`;
-  rightShadow.style.transform = `translateX(${-shadowShift}vw)`;
-
+  // подсказка
   hint.style.opacity = String(Math.max(0,1-progress*1.6));
 
   if(progress>=DISABLE_HERO_AT){
@@ -181,7 +178,6 @@ function animateTo(target,duration=360){
 }
 
 window.addEventListener('pointerdown',function(e){
-  // старт драга по области hero
   if(e.target.closest('.hero') && getComputedStyle(hero).pointerEvents!=='none'){
     isDragging=true; potentialClose=false;
     startY=e.clientY; startProgress=progress;
@@ -189,7 +185,6 @@ window.addEventListener('pointerdown',function(e){
     e.preventDefault&&e.preventDefault();
     return;
   }
-  // если уже открыто — возможность закрыть свайпом со slider top
   if(e.target.closest('#slider') && progress>=DISABLE_HERO_AT){
     if(slider.scrollTop<=2){
       potentialClose=true;
