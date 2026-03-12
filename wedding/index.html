@@ -4,10 +4,11 @@
   <meta charset="UTF-8">
   <title>3D двери</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+
   <style>
-    :root{
-      --initial-gap:2;
-      --max-gap:50;
+    :root {
+      --initial-gap: 2;
+      --max-gap: 50;
     }
 
     html, body {
@@ -212,13 +213,18 @@
     hint.style.opacity = Math.max(0, 1 - progress * 1.5);
   }
 
-  /* pointer events */
+  /* pointer events для дверей */
+  let isDragging = false;
+
   window.addEventListener("pointerdown", e => {
-    startY = e.clientY;
+    if (e.target.closest('.hero')) {
+      isDragging = true;
+      startY = e.clientY;
+    }
   });
 
   window.addEventListener("pointermove", e => {
-    if (startY === null) return;
+    if (!isDragging || startY === null) return;
 
     const dy = startY - e.clientY;
     const p = dy / (window.innerHeight * .6);
@@ -229,6 +235,7 @@
   });
 
   window.addEventListener("pointerup", () => {
+    isDragging = false;
     startY = null;
   });
 
