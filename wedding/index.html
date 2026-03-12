@@ -22,7 +22,7 @@
     display: flex;
     pointer-events: auto; /* ловим события жестов */
     touch-action: none;   /* отключаем системные жесты браузера */
-    background: #fff;
+    background: transparent; /* <-- изменено: было #fff, теперь прозрачный чтобы был виден слайд под ним */
     overflow: hidden;
   }
   .door {
@@ -111,10 +111,12 @@
     justify-content: center;
     align-items: center;
   }
+  /* Изменено: делаем слайды полноэкранными, чтобы первый слайд точно был виден через зазор */
   .slide img {
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
   }
 
   /* Когда двери полностью открыты, скрываем слой */
@@ -194,6 +196,13 @@
     // Меняем прозрачность подсказки и spine
     hero.querySelector('.spine').style.opacity = String(1 - Math.min(1, progress * 1.1));
     hint.style.opacity = String(Math.max(0, 1 - progress * 1.6));
+
+    // ОПЦИОНАЛЬНО: если хотите, чтобы сами изображения створок немного исчезали по мере открытия,
+    // раскомментируйте строки ниже:
+    // const doorLeftImg = document.querySelector('.door.left img');
+    // const doorRightImg = document.querySelector('.door.right img');
+    // doorLeftImg.style.opacity = String(1 - progress);
+    // doorRightImg.style.opacity = String(1 - progress);
 
     if (progress >= 0.98 && !opened) {
       // Полностью открыто
