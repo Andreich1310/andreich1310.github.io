@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <title>3D двери</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-
   <style>
     :root {
       --initial-gap: 2;
@@ -36,7 +35,7 @@
       position: relative;
       overflow: hidden;
       transform-style: preserve-3d;
-      transition: transform .25s ease-out;
+      transition: transform 0.4s ease-out;
     }
 
     .door img {
@@ -193,29 +192,31 @@
   const slider = document.querySelector('.slider');
   let progress = 0;
   let startY = null;
+  let isDragging = false;
 
+  // Функция для изменения прогресса открытия дверей
   function setProgress(p) {
     progress = Math.max(0, Math.min(1, p));
 
     const shift = 2 + progress * (50 - 2);
     const rotate = 30;
 
+    // Обновление положения створок
     leftDoor.style.transform =
       `translateX(${-shift}vw) rotateY(${-progress * rotate}deg)`;
 
     rightDoor.style.transform =
       `translateX(${shift}vw) rotateY(${progress * rotate}deg)`;
 
-    /* тень между створками */
+    // Обновление тени
     gapShadow.style.width = (4 + progress * 30) + "vw";
     gapShadow.style.opacity = 1 - progress * .6;
 
+    // Подсказка
     hint.style.opacity = Math.max(0, 1 - progress * 1.5);
   }
 
-  /* pointer events для дверей */
-  let isDragging = false;
-
+  // Обработчики событий для открывания дверей
   window.addEventListener("pointerdown", e => {
     if (e.target.closest('.hero')) {
       isDragging = true;
@@ -239,7 +240,7 @@
     startY = null;
   });
 
-  /* wheel */
+  // Обработчик колесика мыши
   window.addEventListener("wheel", e => {
     e.preventDefault();
     setProgress(progress + e.deltaY * .002);
