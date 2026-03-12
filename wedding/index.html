@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Приглашение — зазор и тень</title>
+<title>Приглашение — створки с разными частями изображения</title>
 <style>
   :root{
     --initial-gap-vw: 2;   /* видимый зазор в закрытом состоянии */
@@ -32,9 +32,9 @@
     height:100%;
     overflow:hidden;
     display:block;
-    background:#fff;
   }
 
+  /* Обрезка картинки для левой и правой створки */
   .door img{
     position:absolute;
     inset:0;
@@ -45,6 +45,14 @@
     -webkit-user-drag:none;
     user-select:none;
     pointer-events:none;
+  }
+
+  .left  { 
+    clip-path: inset(0 50% 0 0);  /* Левый край обрезаем от правой части изображения */
+  }
+
+  .right { 
+    clip-path: inset(0 0 0 50%);  /* Правый край обрезаем от левой части изображения */
   }
 
   /* внутренняя тень у краёв дверей, чтобы показать "стык" */
