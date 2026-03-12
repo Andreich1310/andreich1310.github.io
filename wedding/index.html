@@ -216,6 +216,8 @@ const DISABLE_HERO_AT = 0.98;
 const initialGap = 0.5;
 const maxGap = 50;
 const rot = 38;
+const FADE_START = 0.93;
+const FADE_END = 0.98;
 
 let progress = 0;
 let isDragging = false;
@@ -272,7 +274,12 @@ function render(p){
   leftShadow.style.opacity = String(Math.max(0, 0.9 - progress * 0.85));
   rightShadow.style.opacity = String(Math.max(0, 0.9 - progress * 0.85));
   hint.style.opacity = String(Math.max(0, 1 - progress * 1.6));
-  hero.style.opacity = String(Math.max(0, 1 - progress));
+  let fade = 1;
+  if(progress >= FADE_START){
+    const t = Math.min(1, (progress - FADE_START) / (FADE_END - FADE_START));
+    fade = 1 - t;
+  }
+  hero.style.opacity = String(Math.max(0, fade));
 
   setHeroVisible(progress < DISABLE_HERO_AT);
 }
