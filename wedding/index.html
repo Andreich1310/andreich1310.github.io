@@ -3,80 +3,177 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Doors — Apple-style with shadows</title>
+<title>Doors</title>
+
 <style>
-:root{ --gap-start:2; --gap-end:50; }
-html,body{height:100%;margin:0;overflow:hidden;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
-/* overlay */
+:root{
+  --gap-start:.5;
+  --gap-end:50;
+}
+
+html,body{
+  height:100%;
+  margin:0;
+  overflow:hidden;
+  font-family:system-ui;
+}
+
 .hero{
-  position:fixed; inset:0; display:flex; z-index:40;
-  perspective:1800px;
-  pointer-events:auto; transition:opacity .28s ease;
+  position:fixed;
+  inset:0;
+  display:flex;
+  perspective:1000px;
+  z-index:100;
+  transition:opacity .35s cubic-bezier(.22,.61,.36,1);
   touch-action:none;
 }
+
 .hero.dragging .door,
+.hero.dragging .panel,
 .hero.dragging .door img,
 .hero.dragging .door-shadow,
 .hero.dragging .hint{
   transition:none;
 }
+
 .door{
-  width:50%; height:100%; position:relative; overflow:hidden;
-  transform-style:preserve-3d; will-change:transform;
-  transition: transform .38s cubic-bezier(.22,.61,.36,1);
-  backface-visibility:hidden;
+  width:50%;
+  height:100%;
+  position:relative;
+  transform-style:preserve-3d;
+  will-change:transform;
+  overflow:visible;
 }
-.door img{
-  width:100%; height:100%; object-fit:cover; display:block;
-  transition: transform .38s cubic-bezier(.22,.61,.36,1); will-change:transform;
-  position:relative; z-index:2;
-}
-.left{ transform-origin:right center; } .right{ transform-origin:left center; }
-.left img{ object-position:right center; } .right img{ object-position:left center; }
 
-/* тень под створкой */
+.left{ transform-origin:right center; }
+.right{ transform-origin:left center; }
+
+.panel{
+  position:absolute;
+  inset:0;
+  transform-style:preserve-3d;
+  will-change:transform;
+  transition:transform .35s cubic-bezier(.22,.61,.36,1);
+}
+
+.left .panel{ transform-origin:right bottom; }
+.right .panel{ transform-origin:left bottom; }
+
+.panel::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  border:1px solid rgba(0,0,0,.08);
+  pointer-events:none;
+  z-index:5;
+}
+
+.panel img{
+  width:200%;
+  height:100%;
+  object-fit:cover;
+  position:absolute;
+  top:0;
+  z-index:2;
+  will-change:transform;
+  transition:transform .35s cubic-bezier(.22,.61,.36,1);
+}
+
+.left img{ left:0; }
+.right img{ right:0; }
+
 .door-shadow{
-  position:absolute; top:0; bottom:0; width:8vw; pointer-events:none;
-  z-index:0; filter:blur(18px); opacity:.9;
-}
-.door-shadow.left{
-  right:6vw;
-  background: linear-gradient(to right, rgba(0,0,0,.72), rgba(0,0,0,.32), transparent);
-}
-.door-shadow.right{
-  left:6vw;
-  background: linear-gradient(to left, rgba(0,0,0,.72), rgba(0,0,0,.32), transparent);
+  position:absolute;
+  top:0;
+  bottom:0;
+  width:10vw;
+  filter:blur(18px);
+  opacity:.9;
+  pointer-events:none;
 }
 
-.inner-edge{ position:absolute; top:0; bottom:0; width:16px; z-index:9; pointer-events:none; mix-blend-mode:multiply; }
+.left .door-shadow{
+  right:-6vw;
+  background:linear-gradient(to right,rgba(0,0,0,.7),transparent);
+}
+
+.right .door-shadow{
+  left:-6vw;
+  background:linear-gradient(to left,rgba(0,0,0,.7),transparent);
+}
+
+.inner-edge{
+  position:absolute;
+  top:0;
+  bottom:0;
+  width:16px;
+  z-index:9;
+  pointer-events:none;
+  mix-blend-mode:multiply;
+}
 .left .inner-edge{ right:0; background:linear-gradient(to left, rgba(0,0,0,.46), rgba(0,0,0,.06) 36%, transparent 100%); }
 .right .inner-edge{ left:0; background:linear-gradient(to right, rgba(0,0,0,.46), rgba(0,0,0,.06) 36%, transparent 100%); }
 
-.hint{ position:absolute; left:50%; bottom:12vh; transform:translateX(-50%); z-index:50; display:flex; flex-direction:column; align-items:center; gap:8px; pointer-events:none; transition:opacity .18s;}
+.hint{
+  position:absolute;
+  left:50%;
+  bottom:12vh;
+  transform:translateX(-50%);
+  z-index:50;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:8px;
+  pointer-events:none;
+  transition:opacity .18s;
+}
 .hint svg{ width:28px; height:28px; display:block; animation:bob 1.2s infinite ease-in-out; }
 @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
 .label{ background:rgba(255,255,255,.96); padding:6px 12px; border-radius:999px; box-shadow:0 6px 18px rgba(0,0,0,.08); font-size:13px; }
 
-.slider{ position:relative; z-index:1; height:100vh; overflow-y:auto; scroll-snap-type:y mandatory; -webkit-overflow-scrolling:touch; }
-.slide{ height:100vh; scroll-snap-align:start; }
-.slide img{ width:100%; height:100%; object-fit:cover; display:block; }
+.slider{
+  position:relative;
+  height:100vh;
+  overflow-y:auto;
+  scroll-snap-type:y mandatory;
+  -webkit-overflow-scrolling:touch;
+}
 
-@media (max-width:520px){ .door-shadow{ width:14vw; filter:blur(12px); } .inner-edge{ width:12px; } }
+.slide{
+  height:100vh;
+  scroll-snap-align:start;
+}
+
+.slide img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+
+@media (max-width:520px){
+  .door-shadow{ width:14vw; filter:blur(12px); }
+  .inner-edge{ width:12px; }
+}
 </style>
 </head>
+
 <body>
 
 <div class="hero" id="hero" aria-hidden="false">
   <div class="door left" id="leftDoor">
-    <div class="door-shadow left"></div>
-    <img src="Обложка web.svg" alt="">
-    <div class="inner-edge"></div>
+    <div class="panel">
+      <div class="door-shadow"></div>
+      <img src="Обложка web.svg" alt="">
+      <div class="inner-edge"></div>
+    </div>
   </div>
 
   <div class="door right" id="rightDoor">
-    <div class="door-shadow right"></div>
-    <img src="Обложка web.svg" alt="">
-    <div class="inner-edge"></div>
+    <div class="panel">
+      <div class="door-shadow"></div>
+      <img src="Обложка web.svg" alt="">
+      <div class="inner-edge"></div>
+    </div>
   </div>
 
   <div class="hint" id="hint">
@@ -87,10 +184,16 @@ html,body{height:100%;margin:0;overflow:hidden;font-family:system-ui,-apple-syst
   </div>
 </div>
 
-<div class="slider" id="slider" tabindex="0">
-  <section class="slide"><img src="center.svg" alt=""></section>
-  <section class="slide"><img src="Левая web.svg" alt=""></section>
-  <section class="slide"><img src="Правая web.svg" alt=""></section>
+<div class="slider" id="slider">
+  <section class="slide">
+    <img src="center.svg" alt="">
+  </section>
+  <section class="slide">
+    <img src="Левая web.svg" alt="">
+  </section>
+  <section class="slide">
+    <img src="Правая web.svg" alt="">
+  </section>
 </div>
 
 <script>
@@ -98,6 +201,8 @@ html,body{height:100%;margin:0;overflow:hidden;font-family:system-ui,-apple-syst
 const hero = document.getElementById('hero');
 const leftDoor = document.getElementById('leftDoor');
 const rightDoor = document.getElementById('rightDoor');
+const leftPanel = leftDoor.querySelector('.panel');
+const rightPanel = rightDoor.querySelector('.panel');
 const leftImg = leftDoor.querySelector('img');
 const rightImg = rightDoor.querySelector('img');
 const leftShadow = leftDoor.querySelector('.door-shadow');
@@ -107,7 +212,7 @@ const slider = document.getElementById('slider');
 
 const SWIPE_DISTANCE_FACTOR = 0.12;
 const DISABLE_HERO_AT = 0.98;
-const initialGap = 2;
+const initialGap = 0.5;
 const maxGap = 50;
 const rot = 38;
 
@@ -136,7 +241,6 @@ function setHeroVisible(visible){
   if(heroVisible === visible) return;
   heroVisible = visible;
   hero.style.pointerEvents = visible ? 'auto' : 'none';
-  hero.style.opacity = visible ? '1' : '0';
   hero.setAttribute('aria-hidden', visible ? 'false' : 'true');
   if(visible) blockSlider(); else unblockSlider();
 }
@@ -148,17 +252,26 @@ function setDraggingState(active){
 function render(p){
   progress = clamp(p);
   const shift = initialGap + progress * (maxGap - initialGap);
-  leftDoor.style.transform = `translateX(${-shift}vw) rotateY(${-progress * rot}deg)`;
-  rightDoor.style.transform = `translateX(${shift}vw) rotateY(${progress * rot}deg)`;
+  const depth = progress * 80;
+  const tilt = -progress * 6;
+  const scaleY = 1 + progress * 0.12;
 
-  const imgScale = 1 + progress * 0.02;
+  leftDoor.style.transform =
+    `translateX(${-shift}vw) rotateY(${-progress * rot}deg) translateZ(${-depth}px) rotateX(${tilt}deg)`;
+  rightDoor.style.transform =
+    `translateX(${shift}vw) rotateY(${progress * rot}deg) translateZ(${-depth}px) rotateX(${tilt}deg)`;
+
+  leftPanel.style.transform = `scaleY(${scaleY})`;
+  rightPanel.style.transform = `scaleY(${scaleY})`;
+
   const imgZ = -progress * 20;
-  leftImg.style.transform = `translateZ(${imgZ}px) scale(${imgScale})`;
-  rightImg.style.transform = `translateZ(${imgZ}px) scale(${imgScale})`;
+  leftImg.style.transform = `translateZ(${imgZ}px)`;
+  rightImg.style.transform = `translateZ(${imgZ}px)`;
 
-  leftShadow.style.opacity = String(0.9 - progress * 0.85);
-  rightShadow.style.opacity = String(0.9 - progress * 0.85);
+  leftShadow.style.opacity = String(Math.max(0, 0.9 - progress * 0.85));
+  rightShadow.style.opacity = String(Math.max(0, 0.9 - progress * 0.85));
   hint.style.opacity = String(Math.max(0, 1 - progress * 1.6));
+  hero.style.opacity = String(Math.max(0, 1 - progress));
 
   setHeroVisible(progress < DISABLE_HERO_AT);
 }
@@ -172,19 +285,18 @@ function scheduleRender(p){
   });
 }
 
-function animateTo(target, duration = 360){
+function animateTo(target, duration = 420){
   const from = progress;
   const start = performance.now();
   function step(now){
     const t = Math.min(1, (now - start) / duration);
-    const eased = 1 - Math.pow(1 - t, 3);
+    const eased = 1 - Math.pow(1 - t, 4);
     render(from + (target - from) * eased);
     if(t < 1) requestAnimationFrame(step);
   }
   requestAnimationFrame(step);
 }
 
-/* Pointer handling */
 window.addEventListener('pointerdown', function(e){
   if(e.target.closest('.hero') && heroVisible){
     isDragging = true; potentialClose = false;
@@ -259,18 +371,18 @@ window.addEventListener('wheel', function(e){
   const sensitivity = 0.003;
   scheduleRender(progress + e.deltaY * sensitivity);
   if(wheelTimer) clearTimeout(wheelTimer);
-  wheelTimer = setTimeout(()=>{ wheelTimer = null; const target = (progress > 0.5) ? 1 : 0; animateTo(target, 360); }, 110);
+  wheelTimer = setTimeout(() => {
+    wheelTimer = null;
+    const target = (progress > 0.5) ? 1 : 0;
+    animateTo(target, 360);
+  }, 110);
 }, { passive:false });
-
-window.addEventListener('keydown', function(e){
-  if(e.key === 'Escape') animateTo(0);
-  if(e.key === 'Enter' || e.key === ' ') animateTo(progress > 0.5 ? 0 : 1);
-});
 
 blockSlider();
 render(0);
 window.addEventListener('resize', () => render(progress));
 })();
 </script>
+
 </body>
 </html>
