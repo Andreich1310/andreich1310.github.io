@@ -1,392 +1,273 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Приглашение — створки с разными частями изображения</title>
-<style>
-  :root{
-    --initial-gap-vw: 2;   /* видимый зазор в закрытом состоянии */
-    --max-gap-vw: 50;      /* максимальный сдвиг при progress=1 */
-    --hint-color: rgba(0,0,0,0.55);
-    --edge-shadow-w: 8px;  /* ширина внутренней тени у краёв створок */
+  <meta charset="UTF-8">
+  <title>Исправление створок</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+  :root {
+    --initial-gap-vw: 2; /* начальный зазор между створками */
+    --max-gap-vw: 50;    /* сдвиг при прогрессе 1 (100%) */
+    --anim-duration: 300ms;
+  }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
   }
 
-  html,body{height:100%;margin:0;background:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;}
-
-  /* HERO — поверх всего, ловит жесты */
-  .hero{
-    position:fixed;
-    inset:0;
-    z-index:50;
-    overflow:hidden;
-    pointer-events:auto;
-    touch-action:none;
-    background:transparent;
-    display:flex;
+  /* ===== Двери (hero) ===== */
+  .hero {
+    position: fixed;
+    inset: 0; z-index: 50;
+    display: flex;
+    pointer-events: auto; /* ловим события жестов */
+    touch-action: none;   /* отключаем системные жесты браузера */
+    background: #fff;
+    overflow: hidden;
   }
-
-  .door{
-    position:relative;
-    width:50%;
-    height:100%;
-    overflow:hidden;
-    display:block;
+  .door {
+    position: relative;
+    width: 50%;
+    height: 100%;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
   }
-
-  /* Обрезка картинки для левой и правой створки */
-  .door img{
-    position:absolute;
-    inset:0;
-    width:100%;
-    height:100%;
-    object-fit:cover;
-    display:block;
-    -webkit-user-drag:none;
-    user-select:none;
-    pointer-events:none;
+  .door img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
   }
-
-  .left  { 
-    clip-path: inset(0 50% 0 0);  /* Левый край обрезаем от правой части изображения */
+  /* Левый дверной проём показывает левую часть изображения */
+  .door.left img { object-position: left center; }
+  /* Правый дверной проём показывает правую часть изображения */
+  .door.right img { object-position: right center; }
+  /* Тени у внутренних краёв створок для эффекта стыка */
+  .inner-edge {
+    position: absolute; top: 0; bottom: 0;
+    width: 8px;
+    pointer-events: none;
+    z-index: 60;
   }
+  .left .inner-edge  { right: 0; background: linear-gradient(to left, rgba(0,0,0,0.16), transparent); }
+  .right .inner-edge { left: 0;  background: linear-gradient(to right, rgba(0,0,0,0.16), transparent); }
 
-  .right { 
-    clip-path: inset(0 0 0 50%);  /* Правый край обрезаем от левой части изображения */
-  }
-
-  /* внутренняя тень у краёв дверей, чтобы показать "стык" */
-  .door .inner-edge{
-    position:absolute;
-    top:0;
-    bottom:0;
-    width:var(--edge-shadow-w);
-    pointer-events:none;
-    z-index:60;
-  }
-  .left .inner-edge{ right:0; background: linear-gradient(to left, rgba(0,0,0,0.16), rgba(0,0,0,0)); }
-  .right .inner-edge{ left:0;  background: linear-gradient(to right, rgba(0,0,0,0.16), rgba(0,0,0,0)); }
-
-  /* Центр: тонкая полоска — сам зазор. Покажем её заметнее */
+  /* Центр — видимый зазор (spine) */
   .spine {
-    position:absolute;
-    left:50%;
-    top:0;
-    bottom:0;
-    width:6px;
-    transform:translateX(-50%);
-    pointer-events:none;
-    z-index:65;
-    border-radius:3px;
+    position: absolute;
+    top: 0; bottom: 0;
+    left: calc(50% - 3px);
+    width: 6px;
     background: linear-gradient(90deg, rgba(0,0,0,0.14), rgba(255,255,255,0.02), rgba(0,0,0,0.18));
     box-shadow: 0 0 18px rgba(0,0,0,0.06);
-    transition: opacity .18s linear;
+    pointer-events: none;
+    transition: opacity 0.18s linear;
+    z-index: 55;
   }
 
-  /* Хинт: стрелка + текст */
+  /* Подсказка (стрелка и текст) */
   .hint {
     position: absolute;
-    left:50%;
-    bottom:12vh;
-    transform:translateX(-50%);
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    gap:8px;
-    z-index:70;
-    pointer-events:none;
-    color:var(--hint-color);
-    opacity:1;
-    transition:opacity .25s linear, transform .25s;
+    left: 50%; bottom: 12vh;
+    transform: translateX(-50%);
+    text-align: center;
+    pointer-events: none;
+    opacity: 1;
+    transition: opacity 0.25s;
+    z-index: 70;
+    font-family: sans-serif;
+    color: #222;
+    font-weight: 500;
   }
-
-  .hint svg{
-    width:28px;
-    height:28px;
-    display:block;
-    transform-origin:center;
-    animation: hint-bob 1200ms infinite ease-in-out;
-    opacity:0.92;
+  .hint svg {
+    width: 28px; height: 28px;
+    animation: bob 1.2s infinite ease-in-out;
   }
-  @keyframes hint-bob {
-    0%{ transform:translateY(0) }
-    50%{ transform:translateY(-8px) }
-    100%{ transform:translateY(0) }
-  }
-
-  .hint .label{
-    font-size:13px;
+  @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+  .hint .label {
+    margin-top: 8px;
     background: rgba(255,255,255,0.9);
-    padding:6px 10px;
-    border-radius:999px;
-    box-shadow:0 4px 14px rgba(0,0,0,0.06);
-    color:#222;
-    font-weight:500;
-    letter-spacing:0.2px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+    font-size: 13px;
   }
 
-  /* SLIDER под дверями */
-  .slider{
-    position:relative;
-    z-index:1;
-    height:100dvh;
-    overflow-y:auto;
-    scroll-snap-type:y mandatory;
-    -webkit-overflow-scrolling:touch;
+  /* ===== Скроллер (slider) ===== */
+  .slider {
+    position: relative;
+    z-index: 1;
+    height: 100dvh;
+    overflow-y: auto; /* будет заблокирован JS до открытия */
+    scroll-snap-type: y mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+  .slide {
+    height: 100dvh;
+    scroll-snap-align: start;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  .slide img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
   }
 
-  .slide{
-    height:100dvh;
-    scroll-snap-align:start;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-  }
-
-  .slide img{
-    max-width:100%;
-    max-height:100%;
-    object-fit:contain;
-    display:block;
-    user-select:none;
-    -webkit-user-drag:none;
-  }
-
-  /* когда hero полностью скрыт, добавим класс */
-  .hero.hidden { display:none; }
-
-  /* overlays небольшой fade при частичном открытии (опционально) */
-  .left .overlay,
-  .right .overlay {
-    position:absolute;
-    inset:0;
-    pointer-events:none;
-    transition: opacity .18s linear;
-    background: linear-gradient(180deg, rgba(255,255,255,0), rgba(255,255,255,0));
-  }
-</style>
+  /* Когда двери полностью открыты, скрываем слой */
+  .hero.hidden { display: none; }
+  </style>
 </head>
 <body>
 
-<!-- HERO — поверх -->
-<div class="hero" id="hero" aria-hidden="false" role="region" aria-label="Обложка — потяните вверх, чтобы открыть">
-
-  <div class="door left" id="leftDoor" aria-hidden="true">
-    <img src="Обложка web.svg" alt="Обложка">
-    <div class="inner-edge" aria-hidden="true"></div>
-    <div class="overlay"></div>
+<!-- Двери -->
+<div class="hero" id="hero" aria-label="Обложка — потяните вверх, чтобы открыть">
+  <div class="door left" aria-hidden="true">
+    <!-- Одна и та же картинка для обеих створок -->
+    <img src="Обложка.svg" alt="">
+    <div class="inner-edge"></div>
   </div>
-
-  <div class="door right" id="rightDoor" aria-hidden="true">
-    <img src="Обложка web.svg" alt="Обложка справа">
-    <div class="inner-edge" aria-hidden="true"></div>
-    <div class="overlay"></div>
+  <div class="door right" aria-hidden="true">
+    <img src="Обложка.svg" alt="">
+    <div class="inner-edge"></div>
   </div>
-
-  <div class="spine" id="spine" aria-hidden="true"></div>
-
-  <div class="hint" id="hint" aria-hidden="true">
-    <!-- простая стрелка вверх (SVG) -->
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <div class="spine"></div>
+  <div class="hint" id="hint">
+    <!-- Стрелка вверх (SVG-иконка) -->
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round">
       <polyline points="6 15 12 9 18 15"></polyline>
     </svg>
     <div class="label">Потяни вверх</div>
   </div>
 </div>
 
-<!-- SLIDER (контент под дверями) -->
-<div class="slider" id="slider" aria-hidden="false">
-  <!-- второй слайд (он под дверями) -->
+<!-- Основной слайдер под дверями -->
+<div class="slider" id="slider">
   <section class="slide" aria-label="Центр">
-    <img src="center.svg" alt="Центр">
+    <img src="center.svg" alt="">
   </section>
-
   <section class="slide" aria-label="Левая">
-    <img src="Левая web.svg" alt="Левая">
+    <img src="Левая.svg" alt="">
   </section>
-
   <section class="slide" aria-label="Правая">
-    <object data="Правая web.svg" type="image/svg+xml" style="width:100%;height:100%;display:block;"></object>
+    <img src="Правая.svg" alt="">
   </section>
 </div>
 
 <script>
-/*
-  Progressive drag + initial visible gap + hint.
-  - INITIAL_GAP_VW: небольшой видимый зазор при закрытом состоянии
-  - MAX_GAP_VW: сдвиг при progress=1
-  - MAX_DRAG_PX: сколько пикселей свайпа вверх = progress 1
-*/
-
 (function(){
   const hero = document.getElementById('hero');
-  const leftDoor = document.getElementById('leftDoor');
-  const rightDoor = document.getElementById('rightDoor');
-  const spine = document.getElementById('spine');
   const slider = document.getElementById('slider');
   const hint = document.getElementById('hint');
 
-  // Настройки (можно править)
-  const INITIAL_GAP_VW = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--initial-gap-vw')) || 2;
-  const MAX_GAP_VW     = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--max-gap-vw')) || 50;
-  let MAX_DRAG_PX = Math.max(window.innerHeight * 0.6, 240);
-  const WHEEL_SENSITIVITY = 0.0025;
-  const OPEN_THRESHOLD = 0.98;
-  const CLOSE_THRESHOLD = 0.02;
+  let startY = null, opened = false;
+  const THRESHOLD = 40; // пиксели для срабатывания
+  const DURATION = 300; // ms (должно соответствовать --anim-duration)
 
-  let progress = 0; // 0..1
-  let pointerActive = false;
-  let startY = 0;
-  let opened = false;
-  let lastPointerId = null;
-  let hintDismissed = false;
-
-  // initially show hint
-  hint.style.opacity = '1';
-  hint.setAttribute('aria-hidden','false');
-
-  // block slider until opened
-  function blockSlider(){ slider.style.pointerEvents = 'none'; slider.style.overflowY = 'hidden'; }
-  function unblockSlider(){ slider.style.pointerEvents = 'auto'; slider.style.overflowY = 'auto'; }
-
+  // Изначально блокируем прокрутку и взаимодействие со слайдером
+  function blockSlider() {
+    slider.style.pointerEvents = 'none';
+    slider.style.overflowY = 'hidden';
+  }
+  function unblockSlider() {
+    slider.style.pointerEvents = 'auto';
+    slider.style.overflowY = 'auto';
+  }
   blockSlider();
 
-  function clamp(v, a=0, b=1){ return Math.max(a, Math.min(b, v)); }
+  // Управление прогрессом открытия (0..1)
+  let progress = 0;
+  function setProgress(p) {
+    progress = Math.max(0, Math.min(1, p));
+    // Устанавливаем сдвиг обеих створок: 
+    // initialGap + progress*(maxGap - initialGap) по сторонам от центра
+    const initial = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--initial-gap-vw'));
+    const maxGap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--max-gap-vw'));
+    const shift = initial + progress * (maxGap - initial);
+    // Применяем translateX к .door
+    document.querySelector('.door.left').style.transform = `translateX(${-shift}vw)`;
+    document.querySelector('.door.right').style.transform = `translateX(${shift}vw)`;
+    // Меняем прозрачность подсказки и spine
+    hero.querySelector('.spine').style.opacity = String(1 - Math.min(1, progress * 1.1));
+    hint.style.opacity = String(Math.max(0, 1 - progress * 1.6));
 
-  // update visual: include initial gap
-  function renderProgress(){
-    // compute total shift in vw from center for each side
-    // shiftVW = initialGap + progress * (maxGap - initialGap)
-    const shiftVW = INITIAL_GAP_VW + progress * (MAX_GAP_VW - INITIAL_GAP_VW);
-    leftDoor.style.transform = `translateX(${-shiftVW}vw)`;
-    rightDoor.style.transform = `translateX(${shiftVW}vw)`;
-
-    // spine visibility: more transparent when open
-    spine.style.opacity = String(1 - Math.min(1, progress * 1.1));
-
-    // overlays fade
-    const overlays = document.querySelectorAll('.overlay');
-    overlays.forEach(o => o.style.opacity = String(Math.max(0, 0.28 * (1 - progress))));
-
-    // hint fade faster
-    if (!hintDismissed) {
-      hint.style.opacity = String(Math.max(0, 1 - progress*1.6));
-    }
-  }
-
-  function setProgress(v){
-    progress = clamp(v, 0, 1);
-    renderProgress();
-    // if passed open threshold and not yet opened — finalize
-    if (!opened && progress >= OPEN_THRESHOLD) {
+    if (progress >= 0.98 && !opened) {
+      // Полностью открыто
       opened = true;
-      // small delay so UI shows final opened position, then hide hero and enable slider
-      setTimeout(() => {
+      setTimeout(()=>{
         hero.classList.add('hidden');
         unblockSlider();
       }, 80);
-      // mark hint dismissed
-      dismissHint();
-    } else if (!opened && progress > 0) {
-      // keep hero visible and slider blocked
-      hero.classList.remove('hidden');
-      blockSlider();
-    } else if (!opened && progress <= CLOSE_THRESHOLD) {
-      // fully closed
-      hero.classList.remove('hidden');
-      blockSlider();
+    } else if (progress <= 0 && !opened) {
+      // Если закрыто (progress=0), можно сбросить hint, но он уже спрятан
     }
   }
 
-  // animate numeric progress to target (tiny ease-out)
-  function animateProgressTo(target, duration = 200, cb){
-    const start = performance.now();
-    const from = progress;
-    const diff = target - from;
-    function step(t){
-      const dt = t - start;
-      const ratio = clamp(dt / duration, 0, 1);
-      const eased = 1 - Math.pow(1 - ratio, 3);
-      setProgress(from + diff * eased);
-      if (ratio < 1) requestAnimationFrame(step);
-      else if (cb) cb();
+  // Анимация завершения открытия/закрытия
+  function animateTo(target, duration) {
+    const start = performance.now(), from = progress;
+    function step(now) {
+      const t = (now - start) / duration;
+      if (t < 1) {
+        // ease-out эффект
+        const eased = 1 - Math.pow(1 - t, 3);
+        setProgress(from + (target - from) * eased);
+        requestAnimationFrame(step);
+      } else {
+        setProgress(target);
+      }
     }
     requestAnimationFrame(step);
   }
 
-  // dismiss or hide hint
-  function dismissHint(){
-    hintDismissed = true;
-    hint.style.opacity = '0';
-    hint.setAttribute('aria-hidden','true');
-  }
-
-  // Pointer handlers (pointer API covers mouse + touch + pen)
-  function onPointerDown(e){
+  // Жесты: pointer (работает и для мыши и для тача)
+  window.addEventListener('pointerdown', e => {
     if (opened) return;
-    pointerActive = true;
-    lastPointerId = e.pointerId;
     startY = e.clientY;
-    // when user starts interacting — hide hint soon
-    dismissHint();
-    try { e.target.setPointerCapture && e.target.setPointerCapture(e.pointerId); } catch(e){}
-  }
+    // Убираем hint при первом взаимодействии
+    hint.remove();
+  }, {passive:false});
 
-  function onPointerMove(e){
-    if (!pointerActive || opened || e.pointerId !== lastPointerId) return;
-    const dy = startY - e.clientY; // swipe up -> positive
-    const p = clamp(dy / MAX_DRAG_PX, 0, 1);
+  window.addEventListener('pointermove', e => {
+    if (opened || startY === null) return;
+    const dy = startY - e.clientY;
+    const p = Math.max(0, dy / (window.innerHeight * 0.6));
     setProgress(p);
-  }
+    // Предотвращаем скролл
+    if (dy > 0) e.preventDefault();
+  }, {passive:false});
 
-  function onPointerUp(e){
-    if (!pointerActive || e.pointerId !== lastPointerId) return;
-    pointerActive = false;
-    lastPointerId = null;
-    // finalize: if progress > 0.45 -> open, else -> close
-    if (!opened) {
-      if (progress > 0.45) animateProgressTo(1, 220);
-      else animateProgressTo(0, 180);
-    }
-  }
-
-  // Wheel handler for desktop
-  function onWheel(e){
-    if (opened) return; // normal scroll after open
-    e.preventDefault();
-    dismissHint();
-    const delta = e.deltaY * WHEEL_SENSITIVITY;
-    setProgress(progress + delta);
-    // if moved enough, finalize to 1
-    if (progress >= OPEN_THRESHOLD) setProgress(1);
-  }
-
-  // click on hero can also open
-  hero.addEventListener('click', (e) => {
+  window.addEventListener('pointerup', e => {
     if (opened) return;
-    // quick open via click
-    animateProgressTo(1, 220);
-    dismissHint();
+    if (progress > 0.45) {
+      animateTo(1, 220); // открыть полностью
+    } else {
+      animateTo(0, 180); // закрыть
+    }
+    startY = null;
   });
 
-  // listeners
-  hero.addEventListener('pointerdown', onPointerDown, {passive:false});
-  window.addEventListener('pointermove', onPointerMove, {passive:false});
-  window.addEventListener('pointerup', onPointerUp, {passive:false});
-  window.addEventListener('pointercancel', onPointerUp, {passive:false});
-  window.addEventListener('wheel', onWheel, {passive:false});
+  // Wheel (для desktop)
+  window.addEventListener('wheel', e => {
+    if (opened) return;
+    e.preventDefault();
+    const delta = e.deltaY * 0.0025;
+    setProgress(progress + delta);
+    if (progress >= 0.98) setProgress(1);
+  }, {passive:false});
 
-  // recompute drag length on resize (optional)
-  window.addEventListener('resize', () => {
-    MAX_DRAG_PX = Math.max(window.innerHeight * 0.6, 240);
-    // re-render positions with current progress (in case vw->px changed)
-    renderProgress();
+  // Быстрое открытие по клику (опционально)
+  hero.addEventListener('click', e => {
+    if (!opened) animateTo(1, 220);
   });
 
-  // init
+  // Инициално – закрыто
   setProgress(0);
-
 })();
 </script>
 </body>
-</html>
+  </html>
