@@ -1,105 +1,184 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Apple-like doors — готово</title>
-<style>
-  :root{
-    --initial-gap:2;
-    --max-gap:50;
-  }
-  html,body{height:100%;margin:0;overflow:hidden;font-family:system-ui, -apple-system, "Segoe UI", Roboto, Arial;}
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>3D двери с тенью и инерцией</title>
 
-  /* HERO (overlay with doors) */
-  .hero{
-    position:fixed; inset:0;
-    display:flex; z-index:40;
-    perspective:1800px;
-    pointer-events:auto; /* переключаем динамически в JS */
-    transition:opacity .35s ease;
-  }
+  <style>
+    :root {
+      --initial-gap: 2;
+      --max-gap: 50;
+    }
 
-  /* Doors */
-  .door{
-    width:50%; height:100%; position:relative; overflow:hidden;
-    transform-style:preserve-3d;
-    will-change: transform;
-    transition: transform .45s cubic-bezier(.22,.61,.36,1);
-    -webkit-backface-visibility:hidden; backface-visibility:hidden;
-  }
-  .door img{
-    width:100%; height:100%; object-fit:cover; display:block;
-    will-change: transform;
-    transform-origin:center;
-    transition: transform .45s cubic-bezier(.22,.61,.36,1);
-  }
-  .left{ transform-origin: right center; }
-  .right{ transform-origin: left center; }
-  .left img{ object-position: right center; }
-  .right img{ object-position: left center; }
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      font-family: system-ui, sans-serif;
+    }
 
-  /* Inner thin edge highlight */
-  .inner-edge{
-    position:absolute; top:0; bottom:0;
-    width:18px; pointer-events:none; z-index:8;
-    mix-blend-mode:multiply;
-  }
-  .left .inner-edge{ right:0; background: linear-gradient(to left, rgba(0,0,0,.45), rgba(0,0,0,.08) 40%, transparent 100%); }
-  .right .inner-edge{ left:0; background: linear-gradient(to right, rgba(0,0,0,.45), rgba(0,0,0,.08) 40%, transparent 100%); }
+    /* HERO (overlay with doors) */
+    .hero {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      z-index: 40;
+      perspective: 1800px;
+      pointer-events: auto;
+      transition: opacity .35s ease;
+    }
 
-  /* Dark niche (gap) — центральная тень между створками */
-  .gap-shadow{
-    position:absolute; top:0; bottom:0; left:50%;
-    transform:translateX(-50%); width:4vw;
-    pointer-events:none; z-index:6;
-    background: radial-gradient(ellipse at center, rgba(0,0,0,.85) 0%, rgba(0,0,0,.45) 30%, rgba(0,0,0,.15) 60%, transparent 100%);
-    filter: blur(18px);
-    transition: width .12s linear, opacity .12s linear, transform .12s linear;
-  }
+    /* Doors */
+    .door {
+      width: 50%;
+      height: 100%;
+      position: relative;
+      overflow: hidden;
+      transform-style: preserve-3d;
+      will-change: transform;
+      transition: transform .45s cubic-bezier(.22,.61,.36,1);
+    }
 
-  /* Soft shadows from each door edge for ambient occlusion */
-  .edge-shadow{
-    position:absolute; top:0; bottom:0; width:28px; pointer-events:none; z-index:7;
-    filter: blur(12px);
-    transition: transform .12s linear, opacity .12s linear;
-  }
-  .edge-shadow.left{ right:0; background: linear-gradient(to left, rgba(0,0,0,.5), transparent); }
-  .edge-shadow.right{ left:0; background: linear-gradient(to right, rgba(0,0,0,.5), transparent); }
+    .door img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
 
-  /* hint */
-  .hint{
-    position:absolute; left:50%; bottom:12vh; transform:translateX(-50%);
-    z-index:50; display:flex; flex-direction:column; align-items:center; gap:8px;
-    pointer-events:none; transition:opacity .18s;
-  }
-  .hint svg{ width:28px; height:28px; display:block; animation:bob 1.2s infinite ease-in-out; }
-  @keyframes bob{ 0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)} }
-  .hint .label{ background:rgba(255,255,255,.96); padding:6px 12px; border-radius:999px; box-shadow:0 6px 18px rgba(0,0,0,.08); font-size:13px; }
+    .left { transform-origin: right center; }
+    .right { transform-origin: left center; }
+    .left img { object-position: right center; }
+    .right img { object-position: left center; }
 
-  /* Slider below */
-  .slider{ position:relative; z-index:1; height:100vh; overflow-y:auto; scroll-snap-type:y mandatory; -webkit-overflow-scrolling:touch; }
-  .slide{ height:100vh; scroll-snap-align:start; }
-  .slide img{ width:100%; height:100%; object-fit:cover; display:block; }
+    /* Inner thin edge highlight */
+    .inner-edge {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 18px;
+      pointer-events: none;
+      z-index: 8;
+      mix-blend-mode: multiply;
+    }
 
-  /* Minor responsive fix */
-  @media (max-width:520px){
-    .gap-shadow{ filter: blur(10px); }
-    .edge-shadow{ width:20px; }
-  }
-</style>
+    .left .inner-edge {
+      right: 0;
+      background: linear-gradient(to left, rgba(0, 0, 0, .45), rgba(0, 0, 0, .08) 40%, transparent 100%);
+    }
+
+    .right .inner-edge {
+      left: 0;
+      background: linear-gradient(to right, rgba(0, 0, 0, .45), rgba(0, 0, 0, .08) 40%, transparent 100%);
+    }
+
+    /* Shadow on each door's edge */
+    .edge-shadow {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 28px;
+      pointer-events: none;
+      z-index: 7;
+      filter: blur(12px);
+      transition: transform .12s linear, opacity .12s linear;
+    }
+
+    .edge-shadow.left {
+      right: 0;
+      background: linear-gradient(to left, rgba(0, 0, 0, .5), transparent);
+    }
+
+    .edge-shadow.right {
+      left: 0;
+      background: linear-gradient(to right, rgba(0, 0, 0, .5), transparent);
+    }
+
+    /* Central gap shadow */
+    .gap-shadow {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 4vw;
+      pointer-events: none;
+      z-index: 6;
+      background: radial-gradient(ellipse at center, rgba(0, 0, 0, .85) 0%, rgba(0, 0, 0, .45) 30%, rgba(0, 0, 0, .15) 60%, transparent 100%);
+      filter: blur(18px);
+      transition: width .12s linear, opacity .12s linear, transform .12s linear;
+    }
+
+    /* Hint */
+    .hint {
+      position: absolute;
+      left: 50%;
+      bottom: 12vh;
+      transform: translateX(-50%);
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      pointer-events: none;
+      transition: opacity .18s;
+    }
+
+    .hint svg {
+      width: 28px;
+      height: 28px;
+      display: block;
+      animation: bob 1.2s infinite ease-in-out;
+    }
+
+    @keyframes bob {
+      0%, 100% { transform: translateY(0) }
+      50% { transform: translateY(-8px) }
+    }
+
+    .hint .label {
+      background: rgba(255, 255, 255, .96);
+      padding: 6px 12px;
+      border-radius: 999px;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, .08);
+      font-size: 13px;
+    }
+
+    /* Slider */
+    .slider {
+      height: 100vh;
+      overflow-y: auto;
+      scroll-snap-type: y mandatory;
+      position: relative;
+      z-index: 1;
+    }
+
+    .slide {
+      height: 100vh;
+      scroll-snap-align: start;
+    }
+
+    .slide img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+  </style>
 </head>
+
 <body>
 
-<!-- HERO (doors overlay) -->
-<div class="hero" id="hero" aria-hidden="false" role="group" aria-label="Обложка — потяните вверх чтобы открыть">
+<div class="hero" id="hero">
   <div class="door left" id="leftDoor">
     <img src="Обложка web.svg" alt="">
     <div class="edge-shadow left" id="leftEdge"></div>
     <div class="inner-edge"></div>
   </div>
 
-  <div class="gap-shadow" id="gapShadow" aria-hidden="true"></div>
+  <div class="gap-shadow" id="gapShadow"></div>
 
   <div class="door right" id="rightDoor">
     <img src="Обложка web.svg" alt="">
@@ -107,7 +186,7 @@
     <div class="inner-edge"></div>
   </div>
 
-  <div class="hint" id="hint" aria-hidden="false">
+  <div class="hint" id="hint">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <polyline points="6 15 12 9 18 15"></polyline>
     </svg>
@@ -115,7 +194,6 @@
   </div>
 </div>
 
-<!-- CONTENT (slider) -->
 <div class="slider" id="slider" tabindex="0" aria-label="Контент">
   <section class="slide"><img src="center.svg" alt=""></section>
   <section class="slide"><img src="Левая web.svg" alt=""></section>
