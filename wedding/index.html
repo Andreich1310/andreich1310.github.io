@@ -42,7 +42,7 @@ html,body{
   position:relative;
   transform-style:preserve-3d;
   will-change:transform;
-  overflow:hidden;
+  overflow:visible;
 }
 
 .left{ transform-origin:right center; }
@@ -54,7 +54,6 @@ html,body{
   transform-style:preserve-3d;
   will-change:transform;
   transition:transform .35s cubic-bezier(.22,.61,.36,1);
-  overflow:hidden;
 }
 
 .left .panel{ transform-origin:right bottom; }
@@ -70,18 +69,18 @@ html,body{
 }
 
 .panel img{
-  width:200%;
+  width:100%;
   height:100%;
   object-fit:cover;
-  position:absolute;
-  top:0;
+  display:block;
+  position:relative;
   z-index:2;
   will-change:transform;
   transition:transform .35s cubic-bezier(.22,.61,.36,1);
 }
 
-.left img{ left:0; }
-.right img{ right:0; }
+.left .panel img{ object-position:left center; }
+.right .panel img{ object-position:right center; }
 
 .door-shadow{
   position:absolute;
@@ -91,16 +90,17 @@ html,body{
   filter:blur(18px);
   opacity:.9;
   pointer-events:none;
+  transform-style:preserve-3d;
+  transition: opacity .22s linear, transform .22s linear;
+  transform: translateZ(-80px);
 }
-
-.left .door-shadow{
+.door-shadow.left{
   right:-6vw;
-  background:linear-gradient(to right,rgba(0,0,0,.7),transparent);
+  background:linear-gradient(to right,rgba(0,0,0,.72), rgba(0,0,0,.32), transparent);
 }
-
-.right .door-shadow{
+.door-shadow.right{
   left:-6vw;
-  background:linear-gradient(to left,rgba(0,0,0,.7),transparent);
+  background:linear-gradient(to left,rgba(0,0,0,.72), rgba(0,0,0,.32), transparent);
 }
 
 .inner-edge{
@@ -163,7 +163,7 @@ html,body{
 <div class="hero" id="hero" aria-hidden="false">
   <div class="door left" id="leftDoor">
     <div class="panel">
-      <div class="door-shadow"></div>
+      <div class="door-shadow left"></div>
       <img src="Обложка web.svg" alt="">
       <div class="inner-edge"></div>
     </div>
@@ -171,7 +171,7 @@ html,body{
 
   <div class="door right" id="rightDoor">
     <div class="panel">
-      <div class="door-shadow"></div>
+      <div class="door-shadow right"></div>
       <img src="Обложка web.svg" alt="">
       <div class="inner-edge"></div>
     </div>
