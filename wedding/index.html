@@ -3,67 +3,58 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Doors — corrected transforms</title>
+<title>Doors — realistic door / trapezoid via 3D</title>
 <style>
 :root{ --gap-start:2; --gap-end:50; }
-html,body{height:100%;margin:0;overflow:hidden;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
 
-/* HERO (над слайдером) */
+html,body{
+  height:100%; margin:0; overflow:hidden; font-family:system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+}
+
+/* HERO (поверх слайдера) */
 .hero{
   position:fixed; inset:0; display:flex; z-index:100;
-  perspective:1200px;
+  perspective:1000px; /* чуть сильнее перспектива для выраженного 3D */
   pointer-events:auto; transition:opacity .28s ease;
-  touch-action:none;
-  background:transparent;
+  touch-action:none; background:transparent;
 }
 
 /* DOOR */
 .door{
-  width:50%; height:100%; position:relative;
-  overflow:visible;               /* чтобы повороты/скейлы не обрезались */
-  transform-style:preserve-3d;
-  will-change:transform;
-  transition:transform .35s cubic-bezier(.22,.61,.36,1);
+  width:50%; height:100%; position:relative; overflow:visible;
+  transform-style:preserve-3d; will-change:transform;
+  transition: transform .35s cubic-bezier(.22,.61,.36,1);
   backface-visibility:hidden;
   z-index:30;
   box-shadow: 0 12px 30px rgba(0,0,0,0.06);
 }
 
-/* важные transform-origin: масштаб/трапеция «тянутся» к стыку */
+/* поворотный центр — шов (чтобы scaleY растягивался по шву) */
 .left{ transform-origin: right center; }
 .right{ transform-origin: left center; }
 
 .door img{
-  width:100%;
-  height:100%;
-  object-fit:cover;
-  display:block;
-  position:relative;
-  z-index:40;
-  transform-origin: center center;   /* явный origin для изображений */
-  transform-style:preserve-3d;
-  will-change:transform;
+  width:100%; height:100%; object-fit:cover; display:block;
+  position:relative; z-index:40;
+  transform-style:preserve-3d; will-change:transform;
 }
 
-/* door-shadow — теперь внутри двери (следует за transform), но находится глубже по порядку слоев */
+/* door-shadow — внутри двери, следует за трансформом панели, но лежит "за" картинкой (ниже по z-индексу) */
 .door-shadow{
-  position:absolute; top:0; bottom:0;
-  width:10vw; pointer-events:none;
-  filter:blur(18px);
-  opacity:.9;
-  z-index:10; /* внутри .door: ниже img (z-index:40) */
+  position:absolute; top:0; bottom:0; width:10vw; pointer-events:none;
+  filter:blur(18px); opacity:.9; z-index:10;
   transition: opacity .22s linear, transform .22s linear;
-  will-change:opacity, transform;
-  transform-style:preserve-3d;
-  /* небольшой сдвиг наружу, чтобы тень «падала» на слайд */
+  will-change:opacity, transform; transform-style:preserve-3d;
+  /* базовая глубина тени (чтобы она визуально падала на слайд) */
+  transform: translateZ(-80px);
 }
 .door-shadow.left{ right:-6vw; background: linear-gradient(to right, rgba(0,0,0,.72), rgba(0,0,0,.32), transparent); }
-.door-shadow.right{ left:-6vw; background: linear-gradient(to left, rgba(0,0,0,.72), rgba(0,0,0,.32), transparent); }
+.door-shadow.right{ left:-6vw;  background: linear-gradient(to left,  rgba(0,0,0,.72), rgba(0,0,0,.32), transparent); }
 
-/* внутренняя кромка (над тенью и над изображением) */
+/* внутренняя кромка (над картинками) */
 .inner-edge{ position:absolute; top:0; bottom:0; width:16px; z-index:50; pointer-events:none; mix-blend-mode:multiply; }
 .left .inner-edge{ right:0; background:linear-gradient(to left, rgba(0,0,0,.46), rgba(0,0,0,.06) 36%, transparent 100%); }
-.right .inner-edge{ left:0; background:linear-gradient(to right, rgba(0,0,0,.46), rgba(0,0,0,.06) 36%, transparent 100%); }
+.right .inner-edge{ left:0;  background:linear-gradient(to right, rgba(0,0,0,.46), rgba(0,0,0,.06) 36%, transparent 100%); }
 
 /* hint поверх всего */
 .hint{ position:absolute; left:50%; bottom:12vh; transform:translateX(-50%); z-index:60; display:flex; flex-direction:column; align-items:center; gap:8px; pointer-events:none; transition:opacity .18s;}
@@ -76,7 +67,7 @@ html,body{height:100%;margin:0;overflow:hidden;font-family:system-ui,-apple-syst
 .slide{ height:100vh; scroll-snap-align:start; display:flex; align-items:center; justify-content:center; }
 .slide img{ width:100%; height:100%; object-fit:cover; display:block; }
 
-/* tweaks для мобил */
+/* mobile tweaks */
 @media (max-width:520px){
   .door-shadow{ width:18vw; filter:blur(12px); }
   .inner-edge{ width:12px; }
@@ -90,6 +81,7 @@ html,body{height:100%;margin:0;overflow:hidden;font-family:system-ui,-apple-syst
 <div class="hero" id="hero" aria-hidden="false">
   <div class="door left" id="leftDoor" aria-hidden="true">
     <div class="door-shadow left" aria-hidden="true"></div>
+    <!-- сохраняем <img> как у тебя было -->
     <img src="Обложка web.svg" alt="">
     <div class="inner-edge"></div>
   </div>
@@ -138,138 +130,156 @@ const clamp = v => Math.max(0, Math.min(1, v));
 function render(p){
   progress = clamp(p);
 
-  const shift = 2 + progress*(50-2); // vw shift
-  const rot = 38; // rotation angle deg
+  const shift = 2 + progress*(50-2); // vw - линейный сдвиг створок
+  const rot = 38; // поворот по Y (петли)
 
-  // trapezoid/skew + stretch along Y at seam (scaleY), no scaleX
-  const skew = progress * 4; // deg of skewY for trap effect
-  const stretch = 1 + progress * 0.06; // scaleY to make inner edge "higher"
+  // Реалистичная "дверная" трансформация (вместо skewY)
+  // - translateZ: внутренняя грань уходит в глубину
+  // - rotateX: небольшое наклонение панели (даёт вид трапеции сверху/снизу)
+  // - scaleY: растягивает створку по высоте у шва (усилено вдвое)
+  const doorDepth = progress * 80;           // px, насколько дверь уходит вглубь
+  const rotateX = progress * 6;              // deg — наклон панели по X
+  const scaleY = 1 + progress * 0.12;        // усиленное растяжение по Y (вдвое больше)
+  // оставляем rotateY для петли (открытие)
 
+  // Левая створка (pivot справа)
   leftDoor.style.transform = `
     translateX(${-shift}vw)
-    rotateY(${-progress*rot}deg)
-    skewY(${skew}deg)
-    scaleY(${stretch})
+    rotateY(${-progress * rot}deg)
+    translateZ(${-doorDepth}px)
+    rotateX(${rotateX}deg)
+    scaleY(${scaleY})
   `;
 
+  // Правая створка (pivot слева)
   rightDoor.style.transform = `
     translateX(${shift}vw)
-    rotateY(${progress*rot}deg)
-    skewY(${-skew}deg)
-    scaleY(${stretch})
+    rotateY(${progress * rot}deg)
+    translateZ(${-doorDepth}px)
+    rotateX(${rotateX}deg)
+    scaleY(${scaleY})
   `;
 
-  // тень внутри двери следует за дверью автоматически — управляем только opacity
-  const leftShadow = leftDoor.querySelector('.door-shadow');
-  const rightShadow = rightDoor.querySelector('.door-shadow');
-  leftShadow.style.opacity = String(Math.max(0, 0.9 - progress*1.05));
-  rightShadow.style.opacity = String(Math.max(0, 0.9 - progress*1.05));
+  // Немного подвинем изображение по Z, чтобы оно выглядело "перед" тенью
+  // (изображение остаётся ближе, тень — дальше)
+  const imgZ = -progress * 18; // px
+  leftDoor.querySelector('img').style.transform = `translateZ(${imgZ}px)`;
+  rightDoor.querySelector('img').style.transform = `translateZ(${imgZ}px)`;
 
-  // подсказка
-  hint.style.opacity = String(Math.max(0,1-progress*1.6));
+  // Тени внутри дверей: уменьшаем opacity по мере открытия
+  const ls = leftDoor.querySelector('.door-shadow');
+  const rs = rightDoor.querySelector('.door-shadow');
+  ls.style.opacity = String(Math.max(0, 0.9 - progress * 1.05));
+  rs.style.opacity = String(Math.max(0, 0.9 - progress * 1.05));
 
-  // НЕ скрываем визуально hero (чтобы створки не исчезали).
-  // Только отключаем pointer-events после полного открытия, чтобы давать доступ к слайдеру.
+  // Подсказка
+  hint.style.opacity = String(Math.max(0, 1 - progress * 1.6));
+
+  // НЕ скрываем визуально hero — только отключаем pointer-events при полном открытии
   if(progress >= DISABLE_HERO_AT){
     hero.style.pointerEvents = 'none';
-    hero.setAttribute('aria-hidden','true');
+    hero.setAttribute('aria-hidden', 'true');
   } else {
     hero.style.pointerEvents = 'auto';
-    hero.setAttribute('aria-hidden','false');
+    hero.setAttribute('aria-hidden', 'false');
   }
 }
 
-function animateTo(target,duration=360){
+function animateTo(target, duration = 360){
   const from = progress;
   const start = performance.now();
   function step(now){
-    const t = Math.min(1,(now-start)/duration);
-    const eased = 1 - Math.pow(1-t,3);
-    render(from + (target-from)*eased);
-    if(t<1) requestAnimationFrame(step);
+    const t = Math.min(1, (now - start) / duration);
+    const eased = 1 - Math.pow(1 - t, 3);
+    render(from + (target - from) * eased);
+    if(t < 1) requestAnimationFrame(step);
   }
   requestAnimationFrame(step);
 }
 
-/* Pointer handling (swipe to open/close) */
-window.addEventListener('pointerdown',function(e){
-  if(e.target.closest('.hero') && getComputedStyle(hero).pointerEvents!=='none'){
-    isDragging=true; potentialClose=false;
-    startY=e.clientY; startProgress=progress;
-    lastMoveTime=performance.now(); lastMoveY=e.clientY; velocity=0;
-    e.preventDefault&&e.preventDefault();
+/* Pointer / swipe handling (как в предыдущей версии) */
+window.addEventListener('pointerdown', function(e){
+  if(e.target.closest('.hero') && getComputedStyle(hero).pointerEvents !== 'none'){
+    isDragging = true; potentialClose = false;
+    startY = e.clientY; startProgress = progress;
+    lastMoveTime = performance.now(); lastMoveY = e.clientY; velocity = 0;
+    e.preventDefault && e.preventDefault();
     return;
   }
-  if(e.target.closest('#slider') && progress>=DISABLE_HERO_AT){
-    if(slider.scrollTop<=2){
-      potentialClose=true;
-      startY=e.clientY; startProgress=progress;
-      lastMoveTime=performance.now(); lastMoveY=e.clientY; velocity=0;
-    }else{
-      potentialClose=false;
+  if(e.target.closest('#slider') && progress >= DISABLE_HERO_AT){
+    if(slider.scrollTop <= 2){
+      potentialClose = true;
+      startY = e.clientY; startProgress = progress;
+      lastMoveTime = performance.now(); lastMoveY = e.clientY; velocity = 0;
+    } else {
+      potentialClose = false;
     }
     return;
   }
-},{passive:false});
+}, { passive: false });
 
-window.addEventListener('pointermove',function(e){
-  const now=performance.now();
+window.addEventListener('pointermove', function(e){
+  const now = performance.now();
   if(isDragging){
-    const dy=startY-e.clientY;
-    const swipeDistance=window.innerHeight*SWIPE_DISTANCE_FACTOR;
-    const deltaProgress=dy/swipeDistance;
-    render(startProgress+deltaProgress);
-    const dt=Math.max(8,now-lastMoveTime);
-    const v=(lastMoveY-e.clientY)/dt;
-    velocity=velocity*0.6+v*0.4;
-    lastMoveTime=now; lastMoveY=e.clientY;
-    e.preventDefault&&e.preventDefault();
+    const dy = startY - e.clientY;
+    const swipeDistance = window.innerHeight * SWIPE_DISTANCE_FACTOR;
+    const deltaProgress = dy / swipeDistance;
+    render(startProgress + deltaProgress);
+    const dt = Math.max(8, now - lastMoveTime);
+    const v = (lastMoveY - e.clientY) / dt;
+    velocity = velocity * 0.6 + v * 0.4;
+    lastMoveTime = now; lastMoveY = e.clientY;
+    e.preventDefault && e.preventDefault();
     return;
   }
   if(potentialClose){
-    const dy=startY-e.clientY;
-    const threshold=8;
-    if(Math.abs(dy)>threshold){
-      if(dy<0){
-        isDragging=true; potentialClose=false;
-        hero.style.pointerEvents='auto';
-        startProgress=progress; startY=e.clientY;
-        lastMoveTime=now; lastMoveY=e.clientY; velocity=0;
-        e.preventDefault&&e.preventDefault();
-      }else{
-        potentialClose=false;
+    const dy = startY - e.clientY;
+    const threshold = 8;
+    if(Math.abs(dy) > threshold){
+      if(dy < 0){
+        isDragging = true; potentialClose = false;
+        hero.style.pointerEvents = 'auto';
+        startProgress = progress; startY = e.clientY;
+        lastMoveTime = now; lastMoveY = e.clientY; velocity = 0;
+        e.preventDefault && e.preventDefault();
+      } else {
+        potentialClose = false;
       }
     }
     return;
   }
-},{passive:false});
+}, { passive: false });
 
-window.addEventListener('pointerup',function(){
+window.addEventListener('pointerup', function(){
   if(isDragging){
-    const projectionMs=180;
-    const projected=clamp(progress+velocity*projectionMs/(window.innerHeight*SWIPE_DISTANCE_FACTOR));
-    const target=(projected>0.5)?1:0;
-    const dist=Math.abs(target-progress);
-    const dur=Math.min(600,Math.max(180,280+dist*480));
-    animateTo(target,dur);
+    const projectionMs = 180;
+    const projected = clamp(progress + velocity * projectionMs / (window.innerHeight * SWIPE_DISTANCE_FACTOR));
+    const target = (projected > 0.5) ? 1 : 0;
+    const dist = Math.abs(target - progress);
+    const dur = Math.min(600, Math.max(180, 280 + dist * 480));
+    animateTo(target, dur);
   }
-  isDragging=false; potentialClose=false; startY=0; startProgress=progress; velocity=0;
-},{passive:true});
+  isDragging = false; potentialClose = false; startY = 0; startProgress = progress; velocity = 0;
+}, { passive: true });
 
-let wheelTimer=null;
-window.addEventListener('wheel',function(e){
-  if(getComputedStyle(hero).pointerEvents==='none') return;
+let wheelTimer = null;
+window.addEventListener('wheel', function(e){
+  if(getComputedStyle(hero).pointerEvents === 'none') return;
   e.preventDefault();
-  const sensitivity=0.003;
-  render(progress+e.deltaY*sensitivity);
+  const sensitivity = 0.003;
+  render(progress + e.deltaY * sensitivity);
   if(wheelTimer) clearTimeout(wheelTimer);
-  wheelTimer=setTimeout(()=>{ wheelTimer=null; const target=(progress>0.5)?1:0; animateTo(target,360); },110);
-},{passive:false});
+  wheelTimer = setTimeout(()=>{ wheelTimer = null; const target = (progress > 0.5) ? 1 : 0; animateTo(target, 360); }, 110);
+}, { passive: false });
 
-window.addEventListener('keydown',function(e){ if(e.key==='Escape') animateTo(0); if(e.key==='Enter'||e.key===' ') animateTo(progress>0.5?0:1); });
+window.addEventListener('keydown', function(e){
+  if(e.key === 'Escape') animateTo(0);
+  if(e.key === 'Enter' || e.key === ' ') animateTo(progress > 0.5 ? 0 : 1);
+});
 
 render(0);
-window.addEventListener('resize',()=>render(progress));
+window.addEventListener('resize', ()=>render(progress));
+
 })();
 </script>
 </body>
