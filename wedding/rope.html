@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 
 <style>
+
 html,body{
 margin:0;
 height:100%;
@@ -14,17 +15,20 @@ touch-action:none;
 }
 
 canvas{
+display:block;
 width:100vw;
 height:100vh;
-display:block;
 }
+
 </style>
 </head>
 
 <body>
+
 <canvas id="c"></canvas>
 
 <script>
+
 const canvas=document.getElementById("c")
 const ctx=canvas.getContext("2d")
 
@@ -35,13 +39,12 @@ canvas.height=innerHeight
 resize()
 addEventListener("resize",resize)
 
-/* rope */
-
 const segments=5
 const totalLength=360
 const spacing=totalLength/segments
 
 const minAngle=120*Math.PI/180
+const fixedAngle=120*Math.PI/180
 
 let points=[]
 let sticks=[]
@@ -72,12 +75,10 @@ function build(){
 points=[]
 sticks=[]
 
-const startAngle=120*Math.PI/180
-
 for(let i=0;i<=segments;i++){
 
-let x=anchorX + Math.cos(startAngle)*spacing*i
-let y=anchorY + Math.sin(startAngle)*spacing*i
+let x=anchorX + Math.cos(fixedAngle)*spacing*i
+let y=anchorY + Math.sin(fixedAngle)*spacing*i
 
 const p=new Point(x,y,i===0)
 
@@ -91,9 +92,8 @@ if(i>0)sticks.push(new Stick(points[i-1],p))
 
 build()
 
-/* physics */
-
 const gravity=0.7
+
 let sway=0
 let targetSway=0
 
@@ -113,7 +113,7 @@ const THRESH=70
 
 canvas.addEventListener("pointerdown",e=>{
 
-const end=points[points.length-1]
+const end=points.at(-1)
 const d=Math.hypot(end.x-e.clientX,end.y-e.clientY)
 
 if(d<THRESH){
@@ -218,13 +218,23 @@ C.y+=ny2*push*40
 
 }
 
+/* фикс первого сегмента */
+
+function lockFirstSegment(){
+
+const p0=points[0]
+const p1=points[1]
+
+p1.x=p0.x + Math.cos(fixedAngle)*spacing
+p1.y=p0.y + Math.sin(fixedAngle)*spacing
+
+}
+
 /* physics */
 
 function physics(){
 
 sway+=(targetSway-sway)*0.12
-
-/* verlet */
 
 for(let i=0;i<points.length;i++){
 
@@ -246,11 +256,11 @@ p.x+=sway*(0.5+w*0.1)
 
 }
 
-/* finger inertia */
+/* drag inertia */
 
 if(drag){
 
-const end=points[points.length-1]
+const end=points.at(-1)
 
 end.x+=(fingerX-end.x)*0.35
 end.y+=(fingerY-end.y)*0.35
@@ -263,6 +273,10 @@ for(let k=0;k<12;k++){
 solveSticks()
 solveAngles()
 }
+
+/* фиксируем первый сегмент */
+
+lockFirstSegment()
 
 }
 
@@ -279,6 +293,7 @@ ctx.lineWidth=30
 ctx.strokeStyle="rgba(0,0,0,0.15)"
 
 ctx.beginPath()
+
 ctx.moveTo(points[0].x+2,points[0].y+2)
 
 for(let i=1;i<points.length-1;i++){
@@ -291,14 +306,16 @@ ctx.quadraticCurveTo(points[i].x+2,points[i].y+2,cx+2,cy+2)
 }
 
 ctx.lineTo(points.at(-1).x+2,points.at(-1).y+2)
+
 ctx.stroke()
 
-/* main ribbon */
+/* ribbon */
 
 ctx.lineWidth=26
 ctx.strokeStyle="#c62828"
 
 ctx.beginPath()
+
 ctx.moveTo(points[0].x,points[0].y)
 
 for(let i=1;i<points.length-1;i++){
@@ -311,6 +328,7 @@ ctx.quadraticCurveTo(points[i].x,points[i].y,cx,cy)
 }
 
 ctx.lineTo(points.at(-1).x,points.at(-1).y)
+
 ctx.stroke()
 
 /* highlight */
@@ -319,6 +337,7 @@ ctx.lineWidth=8
 ctx.strokeStyle="rgba(255,255,255,0.35)"
 
 ctx.beginPath()
+
 ctx.moveTo(points[0].x-3,points[0].y-3)
 
 for(let i=1;i<points.length-1;i++){
@@ -331,6 +350,7 @@ ctx.quadraticCurveTo(points[i].x-3,points[i].y-3,cx-3,cy-3)
 }
 
 ctx.lineTo(points.at(-1).x-3,points.at(-1).y-3)
+
 ctx.stroke()
 
 }
@@ -338,13 +358,17 @@ ctx.stroke()
 /* loop */
 
 function loop(){
+
 physics()
 draw()
+
 requestAnimationFrame(loop)
+
 }
 
 loop()
 
 </script>
+
 </body>
 </html>
