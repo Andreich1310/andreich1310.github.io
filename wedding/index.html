@@ -416,6 +416,11 @@ window.addEventListener('pointerup', function(e){
   e.preventDefault && e.preventDefault();
 }, { passive:false });
 
+/* ---------- init ---------- */
+setSlidesTransform(0, false);
+renderHero(0);
+})();
+
 async function loadSVGSlides(){
 
   const containers = document.querySelectorAll(".svg-slide");
@@ -434,11 +439,8 @@ async function loadSVGSlides(){
 }
 
 loadSVGSlides();
-    
-/* ---------- init ---------- */
-setSlidesTransform(0, false);
-renderHero(0);
-})();
+
+  
 </script>
 
 </body>
