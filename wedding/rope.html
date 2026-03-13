@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
-<title>Rope — min radius = total length (very slight bend)</title>
+<title>Rope — max bend enforced (Rmin = total length)</title>
 <style>
   html, body {
     height:100%;
@@ -79,28 +79,25 @@ const ropeWidth = 25;           // толщина ленты
 // Rmin = длина всей ленты (spacing * (segments-1))
 function computeRmin() { return spacing * Math.max(1, segments - 1); }
 
+// For curvature limit we compute maximum allowed angle between consecutive segments:
+// approximation: maxAngle ≈ spacing / Rmin
+function computeMaxAngle() {
+  const R = computeRmin();
+  return Math.max(0.002, spacing / Math.max(1, R));
+}
+
 const gravityY = 0.7;
 let swayX = 0;
 let targetSwayX = 0;
-// уменьшили влияние акселерометра для минимального изгиба
+// немного уменьшили влияние акселерометра для стабильности
 let swayScale = 0.02;
 const swayWeightBase = 0.45;
 const velocityDamping = 0.996;
-let constraintIters = 14; // больше итераций — жёстче
-
-/* compute minAngle from Rmin each frame (radians) */
-function computeMinAngle() {
-  const Rmin = computeRmin();
-  // approx discrete minAngle ≈ spacing / Rmin
-  const a = spacing / Math.max(1, Rmin);
-  // clamp small lower bound for numerical stability
-  return Math.max(0.002, a);
-}
+let constraintIters = 16; // больше итераций — жёстче
 
 /* ===== Accelerometer auto-enable ===== */
 function handleMotion(e) {
   const ax = e.accelerationIncludingGravity?.x || 0;
-  // наклон влево -> верёвка влево (знак настроен)
   targetSwayX = -ax * swayScale;
 }
 function enableMotion(){
@@ -156,72 +153,79 @@ function rotate(x,y,theta){
   return {x: x*c - y*s, y: x*s + y*c};
 }
 
-/* ===== Enforce minimum bend radius / angle =====
-   Here minAngle is computed from Rmin = total length of the rope.
-   We adjust neighbors A and C positions (if they're not pinned) to ensure angle >= minAngle.
+/* ===== Enforce max bend (angle <= maxAngle) =====
+   If local angle theta between A-B and C-B is greater than maxAngle,
+   we rotate the directions symmetrically around the bisector so that
+   their separation becomes exactly maxAngle.
+   We prefer to move A and C (keeping distances to B), but if neighbor pinned,
+   we move the non-pinned one; if both neighbors pinned, we move B slightly.
 */
-function enforceMinBend(minAngle) {
+function enforceMaxBend(maxAngle) {
   const n = points.length;
   for (let i = 1; i < n - 1; i++) {
     const B = points[i];
     const A = points[i - 1];
     const C = points[i + 1];
 
-    // if both neighbors pinned — skip (can't move them)
-    if (A.pinned && C.pinned) continue;
-
     // vectors from B
-    const ax = A.x - B.x, ay = A.y - B.y;
-    const cx = C.x - B.x, cy = C.y - B.y;
+    let ax = A.x - B.x, ay = A.y - B.y;
+    let cx = C.x - B.x, cy = C.y - B.y;
 
     const na = Math.hypot(ax, ay);
     const nc = Math.hypot(cx, cy);
     if (na === 0 || nc === 0) continue;
 
-    let cosTheta = dot(ax,ay, cx,cy) / (na * nc);
-    cosTheta = clamp(cosTheta, -1, 1);
-    const theta = Math.acos(cosTheta);
+    // unit vectors
+    const ua = {x: ax/na, y: ay/na};
+    const uc = {x: cx/nc, y: cy/nc};
 
-    if (theta < minAngle) {
-      // bisector of unit vectors
-      const ua = {x: ax/na, y: ay/na};
-      const uc = {x: cx/nc, y: cy/nc};
+    // current angle
+    let cosTheta = clamp(dot(ua.x,ua.y, uc.x,uc.y), -1, 1);
+    let theta = Math.acos(cosTheta);
+
+    if (theta > maxAngle + 1e-6) {
+      // compute bisector (normalized)
       let bisX = ua.x + uc.x;
       let bisY = ua.y + uc.y;
-      const bisL = Math.hypot(bisX, bisY);
+      let bisL = Math.hypot(bisX, bisY);
       if (bisL < 1e-6) {
-        // nearly opposite -> pick perpendicular to ua
+        // nearly opposite directions — choose perpendicular to ua
         bisX = -ua.y; bisY = ua.x;
-      } else {
-        bisX /= bisL; bisY /= bisL;
+        bisL = Math.hypot(bisX, bisY);
       }
+      bisX /= bisL; bisY /= bisL;
 
-      const half = minAngle / 2;
+      // new separation should be maxAngle; form two directions by rotating bisector by ±maxAngle/2
+      const half = maxAngle / 2;
       const cand1 = rotate(bisX, bisY, +half);
       const cand2 = rotate(bisX, bisY, -half);
 
-      const dot1A = dot(cand1.x, cand1.y, ua.x, ua.y);
-      const dot1C = dot(cand1.x, cand1.y, uc.x, uc.y);
+      // decide assignment: choose which candidate matches ua better
+      const d1 = dot(cand1.x, cand1.y, ua.x, ua.y);
+      const d2 = dot(cand2.x, cand2.y, ua.x, ua.y);
 
-      let dirA, dirC;
-      if (dot1A >= dot1C) { dirA = cand1; dirC = cand2; }
-      else { dirA = cand2; dirC = cand1; }
+      let dirA = d1 > d2 ? cand1 : cand2;
+      let dirC = (dirA === cand1) ? cand2 : cand1;
 
-      // If neighbor pinned — move the non-pinned nodes (or move B if needed)
+      // If both neighbors are movable -> move A and C preserving their distances to B
       if (!A.pinned && !C.pinned) {
         A.x = B.x + dirA.x * na;
         A.y = B.y + dirA.y * na;
         C.x = B.x + dirC.x * nc;
         C.y = B.y + dirC.y * nc;
       } else if (!A.pinned && C.pinned) {
-        // move A only, keep C fixed; possibly move B slightly toward new bisector to satisfy geometry
+        // move only A
         A.x = B.x + dirA.x * na;
         A.y = B.y + dirA.y * na;
       } else if (A.pinned && !C.pinned) {
+        // move only C
         C.x = B.x + dirC.x * nc;
         C.y = B.y + dirC.y * nc;
       } else {
-        // both pinned handled above
+        // both neighbors pinned -> try to move B a bit along bisector to reduce angle
+        const shift = 0.5 * spacing; // small nudge
+        B.x += bisX * shift;
+        B.y += bisY * shift;
       }
     }
   }
@@ -229,7 +233,6 @@ function enforceMinBend(minAngle) {
 
 /* ===== Physics update ===== */
 function updatePhysics() {
-  // smooth sway
   swayX += (targetSwayX - swayX) * 0.12;
 
   for (let i = 0; i < points.length; i++) {
@@ -247,7 +250,7 @@ function updatePhysics() {
     p.x += swayX * (swayWeightBase + 0.1 * weight);
   }
 
-  // basic constraints
+  // constraints
   for (let iter = 0; iter < constraintIters; iter++) {
     for (let s of sticks) {
       const dx = s.p1.x - s.p0.x;
@@ -266,9 +269,10 @@ function updatePhysics() {
     points[0].x = anchorX; points[0].y = anchorY;
   }
 
-  // enforce minimum bend using Rmin = total length
-  const minAngle = computeMinAngle();
-  enforceMinBend(minAngle);
+  // enforce max bend derived from Rmin = total length
+  const maxAngle = computeMaxAngle();
+  // do the bend enforcement a few times to stabilize
+  for (let k = 0; k < 2; k++) enforceMaxBend(maxAngle);
 }
 
 /* ===== Draw ===== */
