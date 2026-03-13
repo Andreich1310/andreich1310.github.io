@@ -2,63 +2,85 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Rope — drag only end</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>Rope — fullscreen, drag end follows finger</title>
 <style>
-  html,body{height:100%;margin:0;background:#f3e6d3;font-family:Inter,system-ui,Arial;}
-  canvas{display:block;width:100%;height:100vh;}
-  /* Без кнопок — акселерометр пытается включиться автоматически */
+  /* Полноэкранная страница, без скролла */
+  html, body {
+    height: 100%;
+    margin: 0;
+    background: #f3e6d3; /* бежевый фон */
+    overscroll-behavior: none; /* отключаем pull-to-refresh в современных браузерах */
+    -webkit-overflow-scrolling: auto;
+    touch-action: none; /* предотвращаем браузерные жесты */
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* canvas занимает весь экран */
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100vh;
+    touch-action: none; /* чтобы pointer события не блокировались */
+  }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
 
 <script>
-/* ---------- canvas ---------- */
+/* ====== Setup canvas (HiDPI aware) ====== */
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d', { alpha: false });
 
-function resize(){
-  canvas.width = innerWidth;
-  canvas.height = innerHeight;
+function resize() {
+  const dpr = window.devicePixelRatio || 1;
+  // full CSS size
+  canvas.style.width = innerWidth + 'px';
+  canvas.style.height = innerHeight + 'px';
+  // actual pixel buffer
+  canvas.width = Math.max(1, Math.floor(innerWidth * dpr));
+  canvas.height = Math.max(1, Math.floor(innerHeight * dpr));
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 addEventListener('resize', resize);
 resize();
 
-/* ---------- verlet physics classes ---------- */
+/* ====== Verlet physics structures ====== */
 class Point {
-  constructor(x,y,pinned=false){
+  constructor(x, y, pinned = false) {
     this.x = x; this.y = y;
     this.oldx = x; this.oldy = y;
     this.pinned = pinned;
   }
 }
 class Stick {
-  constructor(a,b){
+  constructor(a, b) {
     this.p0 = a; this.p1 = b;
     this.length = Math.hypot(a.x - b.x, a.y - b.y);
   }
 }
 
-/* ---------- rope params ---------- */
+/* ====== Rope params (shorter, stiffer) ====== */
 let segments = 18;
 let spacing = 20;
 let points = [];
 let sticks = [];
-let anchorX = canvas.width/2;
+let anchorX = innerWidth / 2;
 let anchorY = 100;
 
-function buildRope(){
+function buildRope() {
   points = []; sticks = [];
-  for(let i=0;i<segments;i++){
-    const p = new Point(anchorX, anchorY + i*spacing, i===0);
+  for (let i = 0; i < segments; i++) {
+    const p = new Point(anchorX, anchorY + i * spacing, i === 0);
     points.push(p);
-    if(i>0) sticks.push(new Stick(points[i-1], p));
+    if (i > 0) sticks.push(new Stick(points[i - 1], p));
   }
 }
 buildRope();
 
-/* ---------- physics params (stiffer) ---------- */
+/* ====== Physics params ====== */
 const gravityY = 0.7;
 let swayX = 0;
 let targetSwayX = 0;
@@ -67,67 +89,85 @@ const swayWeightBase = 0.5;
 const velocityDamping = 0.995;
 const constraintIters = 12;
 
-/* ---------- accelerometer (auto enable) ---------- */
-function handleMotion(e){
+/* ====== Accelerometer auto-enable ====== */
+function handleMotion(e) {
   const ax = e.accelerationIncludingGravity?.x || 0;
   targetSwayX = -ax * swayScale;
 }
-function enableMotion(){
-  if(typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function'){
-    DeviceMotionEvent.requestPermission().then(r=>{
-      if(r === 'granted'){
-        window.addEventListener('devicemotion', handleMotion);
-      }
-    }).catch(()=>{
-      window.addEventListener('devicemotion', handleMotion);
-    });
+function enableMotion() {
+  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+    DeviceMotionEvent.requestPermission()
+      .then(r => { if (r === 'granted') window.addEventListener('devicemotion', handleMotion); })
+      .catch(() => window.addEventListener('devicemotion', handleMotion));
   } else {
     window.addEventListener('devicemotion', handleMotion);
   }
 }
 enableMotion();
 
-/* ---------- pointer drag: only by hanging end ---------- */
+/* ====== Drag: только за конец, при захвате конец следует за пальцем точно ====== */
 let drag = null;
-const DRAG_THRESHOLD = 60; // px — как близко нужно коснуться конца, чтобы начать тащить
+const DRAG_THRESHOLD = 60; // пиксели — радиус захвата конца
 
-canvas.addEventListener('pointerdown', e=>{
-  // разрешаем перетаскивание только если нажали близко к последней точке (svisayushchiy kray)
+canvas.addEventListener('pointerdown', e => {
+  // проверяем только последний сегмент (свисающий край)
   const end = points[points.length - 1];
   const d = Math.hypot(end.x - e.clientX, end.y - e.clientY);
-  if(d <= DRAG_THRESHOLD){
+  if (d <= DRAG_THRESHOLD) {
     drag = end;
-    // чтобы при перетаскивании не "телепортировалось" — обновим oldx/oldy
-    drag.oldx = drag.x;
-    drag.oldy = drag.y;
+    // чтобы никуда не "телепортировало", сразу синхронизируем oldx/oldy
     drag.x = e.clientX;
     drag.y = e.clientY;
-    // отменяем системный drag для лучшего UX
+    drag.oldx = e.clientX;
+    drag.oldy = e.clientY;
+    // предотвращаем системные действия (особенно на iOS/Android)
     e.preventDefault();
   }
-});
+}, { passive: false });
 
-canvas.addEventListener('pointermove', e=>{
-  if(drag){
+canvas.addEventListener('pointermove', e => {
+  if (drag) {
+    // при каждом движении делаем конец точно следовать за пальцем,
+    // обновляя и старую позицию — убираем инерцию при захвате.
     drag.x = e.clientX;
     drag.y = e.clientY;
+    drag.oldx = e.clientX;
+    drag.oldy = e.clientY;
   }
 });
 
-canvas.addEventListener('pointerup', ()=>drag = null);
-canvas.addEventListener('pointercancel', ()=>drag = null);
+function endDrag() { drag = null; }
+canvas.addEventListener('pointerup', endDrag);
+canvas.addEventListener('pointercancel', endDrag);
+window.addEventListener('blur', endDrag);
 
-/* ---------- physics update ---------- */
-function updatePhysics(){
-  // сглаживание целевого бокового сдвига
+/* ====== Disable pull-to-refresh on touch devices, но позволяем drag */
+(function disablePullToRefresh() {
+  // Для современных браузеров overscroll-behavior в CSS уже работает.
+  // Для iOS/Safari и старых реализаций — блокируем touchmove, если не тащим за конец.
+  function touchMoveHandler(e) {
+    if (!drag) {
+      // блокируем дефолтные жесты (pull-to-refresh)
+      e.preventDefault();
+    }
+    // если drag — не предотвращаем, чтобы pointer события работали
+  }
+  // must be non-passive to preventDefault
+  document.addEventListener('touchmove', touchMoveHandler, { passive: false });
+})();
+
+/* ====== Physics update ====== */
+function updatePhysics() {
+  // сглаживание бокового сдвига
   swayX += (targetSwayX - swayX) * 0.12;
 
-  for(let i=0;i<points.length;i++){
+  for (let i = 0; i < points.length; i++) {
     const p = points[i];
-    if(p.pinned) continue;
+    if (p.pinned) continue;
 
-    let vx = (p.x - p.oldx) * velocityDamping;
-    let vy = (p.y - p.oldy) * velocityDamping;
+    // интеграция Verlet
+    const vx = (p.x - p.oldx) * velocityDamping;
+    const vy = (p.y - p.oldy) * velocityDamping;
 
     p.oldx = p.x;
     p.oldy = p.y;
@@ -135,48 +175,48 @@ function updatePhysics(){
     p.x += vx;
     p.y += vy + gravityY;
 
-    // боковое влияние небольшое, чуть сильнее к низу
+    // боковое влияние небольшое; чуть сильнее к низу
     const weight = i / (points.length - 1);
     p.x += swayX * (swayWeightBase + 0.1 * weight);
   }
 
-  // более жёсткие ограничения — больше итераций
-  for(let iter=0; iter<constraintIters; iter++){
-    for(let s of sticks){
+  // ограничения (много итераций для жёсткости)
+  for (let iter = 0; iter < constraintIters; iter++) {
+    for (let s of sticks) {
       const dx = s.p1.x - s.p0.x;
       const dy = s.p1.y - s.p0.y;
       let dist = Math.hypot(dx, dy);
-      if(dist === 0) continue;
-      let diff = (dist - s.length) / dist;
+      if (dist === 0) continue;
+      const diff = (dist - s.length) / dist;
       const offx = dx * 0.5 * diff;
       const offy = dy * 0.5 * diff;
 
-      if(!s.p0.pinned){
+      if (!s.p0.pinned) {
         s.p0.x += offx;
         s.p0.y += offy;
       } else {
         s.p0.x = anchorX;
         s.p0.y = anchorY;
       }
-      if(!s.p1.pinned){
+      if (!s.p1.pinned) {
         s.p1.x -= offx;
         s.p1.y -= offy;
       }
     }
-    // закрепляем верхнюю точку точно
+    // держим верхнюю точку жёстко
     points[0].x = anchorX;
     points[0].y = anchorY;
   }
 }
 
-/* ---------- draw (thick red rope, no tail) ---------- */
-function draw(){
-  // background
+/* ====== Draw (thick red rope, no tail) ====== */
+function draw() {
+  // фон
   ctx.fillStyle = '#f3e6d3';
-  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillRect(0, 0, innerWidth, innerHeight);
 
-  // thick red rope
-  ctx.lineWidth = 25; // 5x шире
+  // толстая красная верёвка
+  ctx.lineWidth = 25; // 5x
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.strokeStyle = '#c62828';
@@ -186,37 +226,44 @@ function draw(){
 
   ctx.beginPath();
   ctx.moveTo(points[0].x, points[0].y);
-  for(let i=1;i<points.length-1;i++){
-    const cx = (points[i].x + points[i+1].x)/2;
-    const cy = (points[i].y + points[i+1].y)/2;
+  for (let i = 1; i < points.length - 1; i++) {
+    const cx = (points[i].x + points[i + 1].x) / 2;
+    const cy = (points[i].y + points[i + 1].y) / 2;
     ctx.quadraticCurveTo(points[i].x, points[i].y, cx, cy);
   }
-  const last = points[points.length-1];
+  const last = points[points.length - 1];
   ctx.lineTo(last.x, last.y);
   ctx.stroke();
 
-  // small knot / connection point (optional visual cue)
+  // небольшой узел/точка в конце
   ctx.shadowBlur = 0;
   ctx.fillStyle = '#8b1f1f';
   ctx.beginPath();
-  ctx.arc(last.x, last.y, 6, 0, Math.PI*2);
+  ctx.arc(last.x, last.y, 6, 0, Math.PI * 2);
   ctx.fill();
 
-  // optional: draw a subtle indicator showing where user can grab (for UX)
-  // (semi-transparent circle around the end)
+  // индикатор области захвата (полупрозрачный круг) — полезный UX
   ctx.fillStyle = 'rgba(0,0,0,0.06)';
   ctx.beginPath();
-  ctx.arc(last.x, last.y, DRAG_THRESHOLD, 0, Math.PI*2);
+  ctx.arc(last.x, last.y, DRAG_THRESHOLD, 0, Math.PI * 2);
   ctx.fill();
 }
 
-/* ---------- main loop ---------- */
-function loop(){
+/* ====== Main loop ====== */
+function loop() {
   updatePhysics();
   draw();
   requestAnimationFrame(loop);
 }
 loop();
+
+/* ====== Keep anchor centered on resize (optional) ====== */
+addEventListener('resize', () => {
+  anchorX = innerWidth / 2;
+  // rebuild rope so anchor positions align with new size
+  buildRope();
+  resize();
+});
 
 </script>
 </body>
