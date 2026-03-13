@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
-<title>Rope — min bend radius (2×width)</title>
+<title>Rope — min radius = total length (very slight bend)</title>
 <style>
   html, body {
     height:100%;
@@ -57,8 +57,8 @@ class Stick {
 }
 
 /* ===== Rope params ===== */
-let segments = 18;
-let spacing = 20;
+let segments = 18;        // количество узлов
+let spacing = 20;         // расстояние между узлами (px)
 let points = [];
 let sticks = [];
 let anchorX = innerWidth / 2;
@@ -75,22 +75,32 @@ function buildRope() {
 buildRope();
 
 /* ===== Visual / physics params ===== */
-const ropeWidth = 25;           // толщина ленты (используется для min-radius)
-const Rmin = 2 * ropeWidth;     // минимальный радиус изгиба = 2 ширины ленты
+const ropeWidth = 25;           // толщина ленты
+// Rmin = длина всей ленты (spacing * (segments-1))
+function computeRmin() { return spacing * Math.max(1, segments - 1); }
+
 const gravityY = 0.7;
 let swayX = 0;
 let targetSwayX = 0;
-const swayScale = 0.033;
-const swayWeightBase = 0.5;
-const velocityDamping = 0.995;
-const constraintIters = 12;
+// уменьшили влияние акселерометра для минимального изгиба
+let swayScale = 0.02;
+const swayWeightBase = 0.45;
+const velocityDamping = 0.996;
+let constraintIters = 14; // больше итераций — жёстче
 
-/* approx discrete min angle: minAngle ≈ spacing / Rmin (radians) */
-const minAngle = Math.max(0.01, spacing / Rmin); // lower bound to avoid zero
+/* compute minAngle from Rmin each frame (radians) */
+function computeMinAngle() {
+  const Rmin = computeRmin();
+  // approx discrete minAngle ≈ spacing / Rmin
+  const a = spacing / Math.max(1, Rmin);
+  // clamp small lower bound for numerical stability
+  return Math.max(0.002, a);
+}
 
 /* ===== Accelerometer auto-enable ===== */
 function handleMotion(e) {
   const ax = e.accelerationIncludingGravity?.x || 0;
+  // наклон влево -> верёвка влево (знак настроен)
   targetSwayX = -ax * swayScale;
 }
 function enableMotion(){
@@ -140,11 +150,6 @@ window.addEventListener('blur', endDrag);
 
 /* ===== Helpers ===== */
 function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
-function normalize(x,y){
-  const l = Math.hypot(x,y);
-  if (l === 0) return {x:0,y:0, l:0};
-  return {x:x/l, y:y/l, l};
-}
 function dot(ax,ay, bx,by){ return ax*bx + ay*by; }
 function rotate(x,y,theta){
   const c = Math.cos(theta), s = Math.sin(theta);
@@ -152,20 +157,18 @@ function rotate(x,y,theta){
 }
 
 /* ===== Enforce minimum bend radius / angle =====
-   For each internal point B (with neighbors A and C), if angle(A-B-C) < minAngle:
-   we reposition A and C symmetrically (keeping their lengths from B) so that angle == minAngle.
-   We only do this when both neighbors are NOT pinned (to avoid moving anchors).
+   Here minAngle is computed from Rmin = total length of the rope.
+   We adjust neighbors A and C positions (if they're not pinned) to ensure angle >= minAngle.
 */
-function enforceMinBend() {
+function enforceMinBend(minAngle) {
   const n = points.length;
-  // for i = 1 .. n-2 (internal points)
   for (let i = 1; i < n - 1; i++) {
     const B = points[i];
     const A = points[i - 1];
     const C = points[i + 1];
 
-    // skip if either neighbor pinned (simple rule)
-    if (A.pinned || C.pinned) continue;
+    // if both neighbors pinned — skip (can't move them)
+    if (A.pinned && C.pinned) continue;
 
     // vectors from B
     const ax = A.x - B.x, ay = A.y - B.y;
@@ -175,58 +178,51 @@ function enforceMinBend() {
     const nc = Math.hypot(cx, cy);
     if (na === 0 || nc === 0) continue;
 
-    // current angle between vectors
     let cosTheta = dot(ax,ay, cx,cy) / (na * nc);
     cosTheta = clamp(cosTheta, -1, 1);
     const theta = Math.acos(cosTheta);
 
     if (theta < minAngle) {
-      // compute bisector direction (sum of unit vectors)
+      // bisector of unit vectors
       const ua = {x: ax/na, y: ay/na};
       const uc = {x: cx/nc, y: cy/nc};
       let bisX = ua.x + uc.x;
       let bisY = ua.y + uc.y;
       const bisL = Math.hypot(bisX, bisY);
-
-      // if vectors are nearly opposite (bisector very small), use perpendicular to one
       if (bisL < 1e-6) {
-        // choose bisector perpendicular to A
+        // nearly opposite -> pick perpendicular to ua
         bisX = -ua.y; bisY = ua.x;
       } else {
         bisX /= bisL; bisY /= bisL;
       }
 
-      // decide rotation direction: ensure rotated directions approximate original ones
-      // we'll create two unit vectors rotated around bisector by +/- minAngle/2
       const half = minAngle / 2;
-
-      // create an orthogonal basis in plane: take bisector as local x axis,
-      // but rotation of a vector around bisector in 2D is simpler: we will build new unit vectors
-      // by rotating bisector by +/- half, then ensure they point roughly towards original A and C.
-
-      // candidate directions
       const cand1 = rotate(bisX, bisY, +half);
       const cand2 = rotate(bisX, bisY, -half);
 
-      // choose which candidate corresponds to A and which to C by checking dot product with original unit vectors
-      // if cand1 more aligned with ua -> assign to A, else swap
       const dot1A = dot(cand1.x, cand1.y, ua.x, ua.y);
       const dot1C = dot(cand1.x, cand1.y, uc.x, uc.y);
 
       let dirA, dirC;
-      if (dot1A >= dot1C) {
-        dirA = cand1;
-        dirC = cand2;
-      } else {
-        dirA = cand2;
-        dirC = cand1;
-      }
+      if (dot1A >= dot1C) { dirA = cand1; dirC = cand2; }
+      else { dirA = cand2; dirC = cand1; }
 
-      // set new positions for A and C preserving their distances na, nc from B
-      A.x = B.x + dirA.x * na;
-      A.y = B.y + dirA.y * na;
-      C.x = B.x + dirC.x * nc;
-      C.y = B.y + dirC.y * nc;
+      // If neighbor pinned — move the non-pinned nodes (or move B if needed)
+      if (!A.pinned && !C.pinned) {
+        A.x = B.x + dirA.x * na;
+        A.y = B.y + dirA.y * na;
+        C.x = B.x + dirC.x * nc;
+        C.y = B.y + dirC.y * nc;
+      } else if (!A.pinned && C.pinned) {
+        // move A only, keep C fixed; possibly move B slightly toward new bisector to satisfy geometry
+        A.x = B.x + dirA.x * na;
+        A.y = B.y + dirA.y * na;
+      } else if (A.pinned && !C.pinned) {
+        C.x = B.x + dirC.x * nc;
+        C.y = B.y + dirC.y * nc;
+      } else {
+        // both pinned handled above
+      }
     }
   }
 }
@@ -251,7 +247,7 @@ function updatePhysics() {
     p.x += swayX * (swayWeightBase + 0.1 * weight);
   }
 
-  // constraints
+  // basic constraints
   for (let iter = 0; iter < constraintIters; iter++) {
     for (let s of sticks) {
       const dx = s.p1.x - s.p0.x;
@@ -262,21 +258,17 @@ function updatePhysics() {
       const offx = dx * 0.5 * diff;
       const offy = dy * 0.5 * diff;
 
-      if (!s.p0.pinned) {
-        s.p0.x += offx; s.p0.y += offy;
-      } else {
-        s.p0.x = anchorX; s.p0.y = anchorY;
-      }
-      if (!s.p1.pinned) {
-        s.p1.x -= offx; s.p1.y -= offy;
-      }
+      if (!s.p0.pinned) { s.p0.x += offx; s.p0.y += offy; }
+      else { s.p0.x = anchorX; s.p0.y = anchorY; }
+      if (!s.p1.pinned) { s.p1.x -= offx; s.p1.y -= offy; }
     }
-    // enforce top anchor
+    // anchor
     points[0].x = anchorX; points[0].y = anchorY;
   }
 
-  // enforce minimum bend AFTER satisfying basic stick constraints (helps stability)
-  enforceMinBend();
+  // enforce minimum bend using Rmin = total length
+  const minAngle = computeMinAngle();
+  enforceMinBend(minAngle);
 }
 
 /* ===== Draw ===== */
@@ -309,7 +301,7 @@ function draw() {
   ctx.arc(last.x, last.y, 6, 0, Math.PI*2);
   ctx.fill();
 
-  // grab area hint (optional)
+  // optional grab hint
   ctx.fillStyle = 'rgba(0,0,0,0.06)';
   ctx.beginPath();
   ctx.arc(last.x, last.y, DRAG_THRESHOLD, 0, Math.PI*2);
@@ -324,7 +316,7 @@ function loop(){
 }
 loop();
 
-/* keep anchor centered on resize */
+/* keep anchor & rope on resize */
 addEventListener('resize', () => {
   anchorX = innerWidth / 2;
   buildRope();
