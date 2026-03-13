@@ -107,7 +107,11 @@ html,body{
   object-fit:cover;
   display:block;
 }
-
+.slide svg {
+  width: 100%;
+  height: 100%;
+  display: block;       /* чтобы убрать лишние пробелы */
+}
   
 @media (max-width:520px){
   .door-shadow{ width:14vw; filter:blur(12px); } .inner-edge{ width:12px; } .door-shadow.left{ right:-10vw; } .door-shadow.right{ left:-10vw; } .gap-light{ width:10px; }
