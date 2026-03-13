@@ -21,7 +21,6 @@ canvas{
 <body>
 <canvas id="c"></canvas>
 <script>
-
 const canvas=document.getElementById("c")
 const ctx=canvas.getContext("2d")
 
@@ -33,36 +32,30 @@ const segments=5
 const totalLength=360
 const spacing=totalLength/segments
 
-/* Начальный угол сегмента и минимальный угол */
-const fixedAngle=50*Math.PI/180
-const minAngle=160*Math.PI/180
-
-/* Увеличение сглаживания кривой */
-const smoothFactor=3
+const fixedAngle = 50*Math.PI/180
+const minAngle = 160*Math.PI/180
 
 let points=[]
 let sticks=[]
+let angularStiffness = 0.15 // пружина углов
 
 class Point{
   constructor(x,y,pinned=false){
-    this.x=x
-    this.y=y
-    this.oldx=x
-    this.oldy=y
+    this.x=x; this.y=y
+    this.oldx=x; this.oldy=y
     this.pinned=pinned
   }
 }
 
 class Stick{
   constructor(a,b){
-    this.p0=a
-    this.p1=b
+    this.p0=a; this.p1=b
     this.length=Math.hypot(a.x-b.x,a.y-b.y)
   }
 }
 
-let anchorX=innerWidth/2
-let anchorY=120
+let anchorX = innerWidth/2
+let anchorY = 120
 
 function build(){
   points=[]
@@ -88,47 +81,35 @@ function motion(e){
 window.addEventListener("devicemotion",motion)
 
 /* drag */
-let drag=false
-let fingerX=0
-let fingerY=0
-const THRESH=70
-canvas.addEventListener("pointerdown",e=>{
+let drag=false, fingerX=0, fingerY=0, THRESH=70
+canvas.addEventListener("pointerdown", e=>{
   const end=points.at(-1)
-  const d=Math.hypot(end.x-e.clientX,end.y-e.clientY)
-  if(d<THRESH){
-    drag=true
-    fingerX=e.clientX
-    fingerY=e.clientY
+  if(Math.hypot(end.x-e.clientX,end.y-e.clientY)<THRESH){
+    drag=true; fingerX=e.clientX; fingerY=e.clientY
   }
 })
-canvas.addEventListener("pointermove",e=>{
-  if(!drag) return
-  fingerX=e.clientX
-  fingerY=e.clientY
+canvas.addEventListener("pointermove", e=>{
+  if(drag){ fingerX=e.clientX; fingerY=e.clientY }
 })
 canvas.addEventListener("pointerup",()=>drag=false)
 canvas.addEventListener("pointercancel",()=>drag=false)
 
-/* constraints */
+/* физика */
 function solveSticks(){
   for(const s of sticks){
-    let dx=s.p1.x-s.p0.x
-    let dy=s.p1.y-s.p0.y
+    let dx=s.p1.x-s.p0.x, dy=s.p1.y-s.p0.y
     let dist=Math.hypot(dx,dy)
     let diff=(dist-s.length)/dist
-    let offx=dx*0.5*diff
-    let offy=dy*0.5*diff
+    let offx=dx*0.5*diff, offy=dy*0.5*diff
     if(!s.p0.pinned){ s.p0.x+=offx; s.p0.y+=offy } else { s.p0.x=anchorX; s.p0.y=anchorY }
     if(!s.p1.pinned){ s.p1.x-=offx; s.p1.y-=offy }
   }
 }
 
-/* минимальный угол между сегментами */
+/* угловая пружина */
 function solveAngles(){
-  for(let i=2;i<points.length-1;i++){
-    const A=points[i-1]
-    const B=points[i]
-    const C=points[i+1]
+  for(let i=1;i<points.length-1;i++){
+    const A=points[i-1], B=points[i], C=points[i+1]
     let v1x=A.x-B.x, v1y=A.y-B.y
     let v2x=C.x-B.x, v2y=C.y-B.y
     let l1=Math.hypot(v1x,v1y), l2=Math.hypot(v2x,v2y)
@@ -136,15 +117,12 @@ function solveAngles(){
     let dot=(v1x*v2x+v1y*v2y)/(l1*l2)
     dot=Math.max(-1,Math.min(1,dot))
     let angle=Math.acos(dot)
-    if(angle<minAngle){
-      const push=(minAngle-angle)*0.5
-      let nx1=v1x/l1, ny1=v1y/l1
-      let nx2=v2x/l2, ny2=v2y/l2
-      A.x+=nx1*push*40
-      A.y+=ny1*push*40
-      C.x+=nx2*push*40
-      C.y+=ny2*push*40
-    }
+    let torque = (angle - minAngle)*angularStiffness
+    // вращаем точки вокруг B
+    const ax = (v1y/l1 - v2y/l2)*torque
+    const ay = (v2x/l2 - v1x/l1)*torque
+    if(!A.pinned){ A.x+=ax; A.y+=ay }
+    if(!C.pinned){ C.x+=ax; C.y+=ay }
   }
 }
 
@@ -155,7 +133,6 @@ function lockFirstSegment(){
   p1.y=p0.y + Math.sin(fixedAngle)*spacing
 }
 
-/* physics */
 function physics(){
   sway+=(targetSway-sway)*0.12
   for(let i=0;i<points.length;i++){
@@ -163,76 +140,36 @@ function physics(){
     if(p.pinned) continue
     let vx=(p.x-p.oldx)*0.995
     let vy=(p.y-p.oldy)*0.995
-    p.oldx=p.x
-    p.oldy=p.y
-    p.x+=vx
-    p.y+=vy+gravity
+    p.oldx=p.x; p.oldy=p.y
+    p.x+=vx; p.y+=vy+gravity
     const w=i/(points.length-1)
     p.x+=sway*(0.5+w*0.1)
   }
+
   if(drag){
     const end=points.at(-1)
     end.x+=(fingerX-end.x)*0.35
     end.y+=(fingerY-end.y)*0.35
   }
+
   for(let k=0;k<12;k++){
     solveSticks()
     solveAngles()
   }
+
   lockFirstSegment()
 }
 
-/* draw */
+/* отрисовка */
 function draw(){
-  ctx.fillStyle="#f3e6d3"
-  ctx.fillRect(0,0,canvas.width,canvas.height)
-
-  /* shadow */
-  ctx.lineWidth=30
-  ctx.strokeStyle="rgba(0,0,0,0.15)"
-  ctx.beginPath()
-  ctx.moveTo(points[0].x+2,points[0].y+2)
-  for(let i=1;i<points.length-1;i++){
-    const cx=(points[i].x+points[i+1].x)/2
-    const cy=(points[i].y+points[i+1].y)/2
-    ctx.quadraticCurveTo(
-      points[i].x+2, points[i].y+2,
-      cx+2 + smoothFactor, cy+2 + smoothFactor
-    )
-  }
-  ctx.lineTo(points.at(-1).x+2,points.at(-1).y+2)
-  ctx.stroke()
-
-  /* ribbon */
+  ctx.clearRect(0,0,canvas.width,canvas.height)
   ctx.lineWidth=26
   ctx.strokeStyle="#c62828"
   ctx.beginPath()
-  ctx.moveTo(points[0].x,points[0].y)
-  for(let i=1;i<points.length-1;i++){
-    const cx=(points[i].x+points[i+1].x)/2
-    const cy=(points[i].y+points[i+1].y)/2
-    ctx.quadraticCurveTo(
-      points[i].x, points[i].y,
-      cx + smoothFactor, cy + smoothFactor
-    )
+  ctx.moveTo(points[0].x, points[0].y)
+  for(let i=1;i<points.length;i++){
+    ctx.lineTo(points[i].x, points[i].y)
   }
-  ctx.lineTo(points.at(-1).x,points.at(-1).y)
-  ctx.stroke()
-
-  /* highlight */
-  ctx.lineWidth=8
-  ctx.strokeStyle="rgba(255,255,255,0.35)"
-  ctx.beginPath()
-  ctx.moveTo(points[0].x-3,points[0].y-3)
-  for(let i=1;i<points.length-1;i++){
-    const cx=(points[i].x+points[i+1].x)/2
-    const cy=(points[i].y+points[i+1].y)/2
-    ctx.quadraticCurveTo(
-      points[i].x-3, points[i].y-3,
-      cx - smoothFactor, cy - smoothFactor
-    )
-  }
-  ctx.lineTo(points.at(-1).x-3,points.at(-1).y-3)
   ctx.stroke()
 }
 
@@ -244,7 +181,6 @@ function loop(){
 }
 
 loop()
-
 </script>
 </body>
 </html>
