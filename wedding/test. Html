@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rope accelerometer demo</title>
+
+<style>
+body{
+  margin:0;
+  background:#111;
+  overflow:hidden;
+  font-family:sans-serif;
+}
+
+canvas{
+  display:block;
+}
+
+button{
+  position:fixed;
+  top:20px;
+  left:20px;
+  padding:10px 16px;
+  border:none;
+  border-radius:8px;
+  background:#fff;
+  cursor:pointer;
+}
+</style>
+</head>
+<body>
+
+<button id="enable">Включить акселерометр</button>
+<canvas id="c"></canvas>
+
+<script>
+
+const canvas = document.getElementById("c")
+const ctx = canvas.getContext("2d")
+
+function resize(){
+  canvas.width = innerWidth
+  canvas.height = innerHeight
+}
+resize()
+addEventListener("resize",resize)
+
+
+/* -------------------------------
+   Rope physics (Verlet)
+--------------------------------*/
+
+class Point{
+  constructor(x,y,pinned=false){
+    this.x=x
+    this.y=y
+    this.oldx=x
+    this.oldy=y
+    this.pinned=pinned
+  }
+}
+
+class Stick{
+  constructor(p0,p1){
+    this.p0=p0
+    this.p1=p1
+    this.length=Math.hypot(p1.x-p0.x,p1.y-p0.y)
+  }
+}
+
+const points=[]
+const sticks=[]
+
+const segments=20
+const spacing=20
+
+for(let i=0;i<segments;i++){
+
+  const p=new Point(
+    canvas.width/2,
+    100+i*spacing,
+    i===0
+  )
+
+  points.push
