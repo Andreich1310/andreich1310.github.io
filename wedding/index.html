@@ -446,7 +446,7 @@ const guestText = params.get("guest");
 if (guestText) {
   alert(guestText);
   const tspans = document.querySelectorAll(".svg-slide tspan");
-
+  alert(tspans.length);
   tspans.forEach(el => {
     if (el.textContent.trim() === "Дорогие и") {
       el.textContent = guestText;
