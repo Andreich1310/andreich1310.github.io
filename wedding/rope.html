@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Rope — ribbon tail with V-cut</title>
+<title>Rope — drag only end</title>
 <style>
   html,body{height:100%;margin:0;background:#f3e6d3;font-family:Inter,system-ui,Arial;}
   canvas{display:block;width:100%;height:100vh;}
-  /* убрал все кнопки — акселерометр пытается включиться автоматически */
+  /* Без кнопок — акселерометр пытается включиться автоматически */
 </style>
 </head>
 <body>
@@ -16,7 +16,7 @@
 <script>
 /* ---------- canvas ---------- */
 const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
+const ctx = canvas.getContext('2d', { alpha: false });
 
 function resize(){
   canvas.width = innerWidth;
@@ -40,7 +40,7 @@ class Stick {
   }
 }
 
-/* ---------- rope params (shorter) ---------- */
+/* ---------- rope params ---------- */
 let segments = 18;
 let spacing = 20;
 let points = [];
@@ -58,21 +58,18 @@ function buildRope(){
 }
 buildRope();
 
-/* ---------- physics params (stiffer, less sway) ---------- */
+/* ---------- physics params (stiffer) ---------- */
 const gravityY = 0.7;
 let swayX = 0;
 let targetSwayX = 0;
-// уменьшили общий добавочный эффект бокового смахивания
-const swayScale = 0.033; // прежнее значение
-const swayWeightBase = 0.5; // вместо 0.9 — менее сильный боковой сдвиг
+const swayScale = 0.033;
+const swayWeightBase = 0.5;
 const velocityDamping = 0.995;
-// увеличим число итераций ограничений для жёсткости
 const constraintIters = 12;
 
 /* ---------- accelerometer (auto enable) ---------- */
 function handleMotion(e){
   const ax = e.accelerationIncludingGravity?.x || 0;
-  // знак уже настроен: наклон влево -> верёвка влево
   targetSwayX = -ax * swayScale;
 }
 function enableMotion(){
@@ -82,7 +79,6 @@ function enableMotion(){
         window.addEventListener('devicemotion', handleMotion);
       }
     }).catch(()=>{
-      // если отказ или недоступно, просто слушаем без запроса
       window.addEventListener('devicemotion', handleMotion);
     });
   } else {
@@ -91,19 +87,33 @@ function enableMotion(){
 }
 enableMotion();
 
-/* ---------- pointer drag ---------- */
+/* ---------- pointer drag: only by hanging end ---------- */
 let drag = null;
+const DRAG_THRESHOLD = 60; // px — как близко нужно коснуться конца, чтобы начать тащить
+
 canvas.addEventListener('pointerdown', e=>{
-  const x = e.clientX, y = e.clientY;
-  let min = 36;
-  for(let p of points){
-    const d = Math.hypot(p.x - x, p.y - y);
-    if(d < min){ drag = p; break; }
+  // разрешаем перетаскивание только если нажали близко к последней точке (svisayushchiy kray)
+  const end = points[points.length - 1];
+  const d = Math.hypot(end.x - e.clientX, end.y - e.clientY);
+  if(d <= DRAG_THRESHOLD){
+    drag = end;
+    // чтобы при перетаскивании не "телепортировалось" — обновим oldx/oldy
+    drag.oldx = drag.x;
+    drag.oldy = drag.y;
+    drag.x = e.clientX;
+    drag.y = e.clientY;
+    // отменяем системный drag для лучшего UX
+    e.preventDefault();
   }
 });
+
 canvas.addEventListener('pointermove', e=>{
-  if(drag){ drag.x = e.clientX; drag.y = e.clientY; }
+  if(drag){
+    drag.x = e.clientX;
+    drag.y = e.clientY;
+  }
 });
+
 canvas.addEventListener('pointerup', ()=>drag = null);
 canvas.addEventListener('pointercancel', ()=>drag = null);
 
@@ -125,7 +135,7 @@ function updatePhysics(){
     p.x += vx;
     p.y += vy + gravityY;
 
-    // боковое влияние меньше, и слегка возрастает к низу
+    // боковое влияние небольшое, чуть сильнее к низу
     const weight = i / (points.length - 1);
     p.x += swayX * (swayWeightBase + 0.1 * weight);
   }
@@ -153,19 +163,19 @@ function updatePhysics(){
         s.p1.y -= offy;
       }
     }
-    // жёстко закрепляем верхнюю точку
+    // закрепляем верхнюю точку точно
     points[0].x = anchorX;
     points[0].y = anchorY;
   }
 }
 
-/* ---------- draw (thick red rope + V-cut tail) ---------- */
+/* ---------- draw (thick red rope, no tail) ---------- */
 function draw(){
   // background
   ctx.fillStyle = '#f3e6d3';
   ctx.fillRect(0,0,canvas.width,canvas.height);
 
-  // draw thick rope centerline (red)
+  // thick red rope
   ctx.lineWidth = 25; // 5x шире
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
@@ -185,57 +195,19 @@ function draw(){
   ctx.lineTo(last.x, last.y);
   ctx.stroke();
 
-  // remove shadow for tail drawing
+  // small knot / connection point (optional visual cue)
   ctx.shadowBlur = 0;
-
-  /* draw V-cut ribbon tail attached to rope end
-     We'll draw a filled red tail rectangle/polygon rotated according to rope angle,
-     then cut a V-notch by drawing background-colored triangle inside it.
-  */
-  const end = points[points.length-1];
-  const prev = points[points.length-2];
-  // angle of the rope end
-  const angle = Math.atan2(end.y - prev.y, end.x - prev.x);
-
-  // tail geometry
-  const tailWidth = 38;   // width of ribbon tail (roughly equals lineWidth + some)
-  const tailLen = 90;     // length of tail
-  const notchDepth = 26;  // V-notch depth
-
-  ctx.save();
-  // translate to a point a little below the rope end to attach tail
-  ctx.translate(end.x, end.y + 6);
-  // rotate to align tail with rope direction (use small factor for subtlety)
-  ctx.rotate(angle * 0.85);
-
-  // draw full tail shape (trapezoid-like) filled with red
-  ctx.fillStyle = '#c62828';
-  ctx.beginPath();
-  ctx.moveTo(-tailWidth/2, 0);
-  ctx.lineTo(tailWidth/2, 0);
-  ctx.lineTo(tailWidth/2, tailLen - notchDepth);
-  ctx.lineTo(0, tailLen);
-  ctx.lineTo(-tailWidth/2, tailLen - notchDepth);
-  ctx.closePath();
-  ctx.fill();
-
-  // draw notch (cut out) by painting background color triangle (simple V)
-  ctx.fillStyle = '#f3e6d3';
-  ctx.beginPath();
-  ctx.moveTo(0, tailLen);
-  ctx.lineTo(-tailWidth/4, tailLen - notchDepth);
-  ctx.lineTo(tailWidth/4, tailLen - notchDepth);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.restore();
-
-  // optional: draw small knot / connection point at join
   ctx.fillStyle = '#8b1f1f';
   ctx.beginPath();
-  ctx.arc(end.x, end.y, 5, 0, Math.PI*2);
+  ctx.arc(last.x, last.y, 6, 0, Math.PI*2);
   ctx.fill();
 
+  // optional: draw a subtle indicator showing where user can grab (for UX)
+  // (semi-transparent circle around the end)
+  ctx.fillStyle = 'rgba(0,0,0,0.06)';
+  ctx.beginPath();
+  ctx.arc(last.x, last.y, DRAG_THRESHOLD, 0, Math.PI*2);
+  ctx.fill();
 }
 
 /* ---------- main loop ---------- */
