@@ -72,26 +72,43 @@ html,body{
 .gap-light{ position:absolute; left:50%; top:0; bottom:0; width:6px; transform:translateX(-50%); pointer-events:none; z-index:20; background: linear-gradient(180deg, rgba(255,245,220,0.95), rgba(255,230,160,0.6)); filter: blur(18px); opacity:0; transition: opacity .26s linear, width .26s linear; }
 
 /* SLIDER: JS-controlled */
+/* slider: use dynamic viewport height (dvh) with vh fallback */
 .slider{
   position:relative;
-  height:100vh;
+  height:100vh;    /* fallback */
+  height:100dvh;   /* prefer dynamic viewport height */
   overflow:hidden;
   touch-action:none;
   -webkit-user-select:none;
   user-select:none;
 }
 
-/* slides container */
+/* slides container — НЕ делаем жесткую 100% высоту, пусть будет auto.
+   Это важно: каждая .slide сама задаёт свою высоту (100dvh). */
 .slides{
-  height:100%;
+  height:auto;     /* <<--- changed */
   width:100%;
   transition: transform 420ms cubic-bezier(.22,.61,.36,1);
   will-change: transform;
 }
 
-.slide{ height:100vh; width:100%; }
-.slide img{ width:100%; height:100%; object-fit:cover; display:block; }
+/* each slide fills the dynamic viewport */
+.slide{
+  height:100vh;    /* fallback for older browsers */
+  height:100dvh;   /* preferred — real visible screen height on mobile */
+  width:100%;
+  box-sizing:border-box;
+}
 
+/* image covers the slide */
+.slide img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+}
+
+  
 @media (max-width:520px){
   .door-shadow{ width:14vw; filter:blur(12px); } .inner-edge{ width:12px; } .door-shadow.left{ right:-10vw; } .door-shadow.right{ left:-10vw; } .gap-light{ width:10px; }
 }
