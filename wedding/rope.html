@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
-<title>Rope — max bend enforced (Rmin = total length)</title>
+<title>Rope — stable, soft max-bend</title>
 <style>
   html, body {
     height:100%;
@@ -57,8 +57,8 @@ class Stick {
 }
 
 /* ===== Rope params ===== */
-let segments = 18;        // количество узлов
-let spacing = 20;         // расстояние между узлами (px)
+let segments = 18;
+let spacing = 20;
 let points = [];
 let sticks = [];
 let anchorX = innerWidth / 2;
@@ -75,25 +75,26 @@ function buildRope() {
 buildRope();
 
 /* ===== Visual / physics params ===== */
-const ropeWidth = 25;           // толщина ленты
-// Rmin = длина всей ленты (spacing * (segments-1))
-function computeRmin() { return spacing * Math.max(1, segments - 1); }
+const ropeWidth = 25;              // толщина ленты
+function computeRmin() { return spacing * Math.max(1, segments - 1); } // Rmin = total length
 
-// For curvature limit we compute maximum allowed angle between consecutive segments:
-// approximation: maxAngle ≈ spacing / Rmin
+/* compute maxAngle from Rmin (approx: spacing / Rmin), but DO NOT let it be insanely tiny;
+   we will *soft-enforce* the maxAngle so very small values still behave stably */
 function computeMaxAngle() {
   const R = computeRmin();
-  return Math.max(0.002, spacing / Math.max(1, R));
+  const raw = spacing / Math.max(1, R);
+  return Math.max(0.002, raw); // lower bound for numeric stability (~0.11°)
 }
 
 const gravityY = 0.7;
 let swayX = 0;
 let targetSwayX = 0;
-// немного уменьшили влияние акселерометра для стабильности
-let swayScale = 0.02;
+// уменьшили влияние акселерометра для более стабильного поведения
+let swayScale = 0.018;
 const swayWeightBase = 0.45;
-const velocityDamping = 0.996;
-let constraintIters = 16; // больше итераций — жёстче
+// чуть больше демпфирования
+const velocityDamping = 0.997;
+let constraintIters = 8; // уменьшили итерации (комбинируем с мягкой коррекцией)
 
 /* ===== Accelerometer auto-enable ===== */
 function handleMotion(e) {
@@ -128,6 +129,7 @@ canvas.addEventListener('pointerdown', e=>{
 
 canvas.addEventListener('pointermove', e=>{
   if (drag) {
+    // конец следует точно за пальцем (обновляем старую позицию — нет инерции при удержании)
     drag.x = e.clientX; drag.y = e.clientY;
     drag.oldx = e.clientX; drag.oldy = e.clientY;
   }
@@ -153,21 +155,18 @@ function rotate(x,y,theta){
   return {x: x*c - y*s, y: x*s + y*c};
 }
 
-/* ===== Enforce max bend (angle <= maxAngle) =====
-   If local angle theta between A-B and C-B is greater than maxAngle,
-   we rotate the directions symmetrically around the bisector so that
-   their separation becomes exactly maxAngle.
-   We prefer to move A and C (keeping distances to B), but if neighbor pinned,
-   we move the non-pinned one; if both neighbors pinned, we move B slightly.
+/* ===== Soft max-bend enforcement =====
+   Instead of snapping A/C instantly, we compute target positions
+   that would satisfy maxAngle and move current positions *partially*
+   toward those targets. This avoids strong impulses and resonance.
 */
-function enforceMaxBend(maxAngle) {
+function enforceMaxBendSoft(maxAngle) {
   const n = points.length;
   for (let i = 1; i < n - 1; i++) {
     const B = points[i];
     const A = points[i - 1];
     const C = points[i + 1];
 
-    // vectors from B
     let ax = A.x - B.x, ay = A.y - B.y;
     let cx = C.x - B.x, cy = C.y - B.y;
 
@@ -175,7 +174,6 @@ function enforceMaxBend(maxAngle) {
     const nc = Math.hypot(cx, cy);
     if (na === 0 || nc === 0) continue;
 
-    // unit vectors
     const ua = {x: ax/na, y: ay/na};
     const uc = {x: cx/nc, y: cy/nc};
 
@@ -184,48 +182,54 @@ function enforceMaxBend(maxAngle) {
     let theta = Math.acos(cosTheta);
 
     if (theta > maxAngle + 1e-6) {
-      // compute bisector (normalized)
+      // bisector
       let bisX = ua.x + uc.x;
       let bisY = ua.y + uc.y;
       let bisL = Math.hypot(bisX, bisY);
       if (bisL < 1e-6) {
-        // nearly opposite directions — choose perpendicular to ua
         bisX = -ua.y; bisY = ua.x;
         bisL = Math.hypot(bisX, bisY);
       }
       bisX /= bisL; bisY /= bisL;
 
-      // new separation should be maxAngle; form two directions by rotating bisector by ±maxAngle/2
       const half = maxAngle / 2;
       const cand1 = rotate(bisX, bisY, +half);
       const cand2 = rotate(bisX, bisY, -half);
 
-      // decide assignment: choose which candidate matches ua better
       const d1 = dot(cand1.x, cand1.y, ua.x, ua.y);
       const d2 = dot(cand2.x, cand2.y, ua.x, ua.y);
-
       let dirA = d1 > d2 ? cand1 : cand2;
       let dirC = (dirA === cand1) ? cand2 : cand1;
 
-      // If both neighbors are movable -> move A and C preserving their distances to B
-      if (!A.pinned && !C.pinned) {
-        A.x = B.x + dirA.x * na;
-        A.y = B.y + dirA.y * na;
-        C.x = B.x + dirC.x * nc;
-        C.y = B.y + dirC.y * nc;
-      } else if (!A.pinned && C.pinned) {
-        // move only A
-        A.x = B.x + dirA.x * na;
-        A.y = B.y + dirA.y * na;
-      } else if (A.pinned && !C.pinned) {
-        // move only C
-        C.x = B.x + dirC.x * nc;
-        C.y = B.y + dirC.y * nc;
-      } else {
-        // both neighbors pinned -> try to move B a bit along bisector to reduce angle
-        const shift = 0.5 * spacing; // small nudge
-        B.x += bisX * shift;
-        B.y += bisY * shift;
+      // target positions preserving distances
+      const txA = B.x + dirA.x * na;
+      const tyA = B.y + dirA.y * na;
+      const txC = B.x + dirC.x * nc;
+      const tyC = B.y + dirC.y * nc;
+
+      // alpha: how strongly to move towards target (adaptive)
+      // proportion grows with severity of violation
+      const rel = clamp((theta - maxAngle) / (Math.PI - maxAngle), 0, 1);
+      const alpha = clamp(0.12 + 0.5 * rel, 0.08, 0.6); // between 0.08 and 0.6
+
+      // apply partial moves, but only to movable points
+      if (!A.pinned) {
+        A.x += (txA - A.x) * alpha;
+        A.y += (tyA - A.y) * alpha;
+        // update oldpos to avoid large velocity injection
+        A.oldx = A.x; A.oldy = A.y;
+      }
+      if (!C.pinned) {
+        C.x += (txC - C.x) * alpha;
+        C.y += (tyC - C.y) * alpha;
+        C.oldx = C.x; C.oldy = C.y;
+      }
+      // if both neighbors pinned -> nudge B slightly along bisector (small alpha)
+      if (A.pinned && C.pinned) {
+        const nudge = 0.06 * spacing;
+        B.x += bisX * nudge;
+        B.y += bisY * nudge;
+        B.oldx = B.x; B.oldy = B.y;
       }
     }
   }
@@ -233,6 +237,7 @@ function enforceMaxBend(maxAngle) {
 
 /* ===== Physics update ===== */
 function updatePhysics() {
+  // smooth sway
   swayX += (targetSwayX - swayX) * 0.12;
 
   for (let i = 0; i < points.length; i++) {
@@ -250,7 +255,7 @@ function updatePhysics() {
     p.x += swayX * (swayWeightBase + 0.1 * weight);
   }
 
-  // constraints
+  // basic stick constraints (fewer iters -> more stable with soft bend enforcement)
   for (let iter = 0; iter < constraintIters; iter++) {
     for (let s of sticks) {
       const dx = s.p1.x - s.p0.x;
@@ -265,14 +270,13 @@ function updatePhysics() {
       else { s.p0.x = anchorX; s.p0.y = anchorY; }
       if (!s.p1.pinned) { s.p1.x -= offx; s.p1.y -= offy; }
     }
-    // anchor
+    // enforce anchor
     points[0].x = anchorX; points[0].y = anchorY;
   }
 
-  // enforce max bend derived from Rmin = total length
+  // soft max-bend enforcement (single pass, but soft)
   const maxAngle = computeMaxAngle();
-  // do the bend enforcement a few times to stabilize
-  for (let k = 0; k < 2; k++) enforceMaxBend(maxAngle);
+  enforceMaxBendSoft(maxAngle);
 }
 
 /* ===== Draw ===== */
@@ -305,7 +309,7 @@ function draw() {
   ctx.arc(last.x, last.y, 6, 0, Math.PI*2);
   ctx.fill();
 
-  // optional grab hint
+  // subtle grab hint
   ctx.fillStyle = 'rgba(0,0,0,0.06)';
   ctx.beginPath();
   ctx.arc(last.x, last.y, DRAG_THRESHOLD, 0, Math.PI*2);
