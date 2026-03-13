@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rope accelerometer demo</title>
+
+<style>
+body{
+  margin:0;
+  background:#111;
+  overflow:hidden;
+  font-family:sans-serif;
+}
+
+canvas{
+  display:block;
+}
+
+button{
+  position:fixed;
+  top:20px;
+  left:20px;
+  padding:10px 16px;
+  border:none;
+  border-radius:8px;
+  background:#fff;
+  cursor:pointer;
+}
+</style>
+</head>
+<body>
+
+<button id="enable">Включить акселерометр</button>
+<canvas id="c"></canvas>
+
+<script>
+
+const canvas = document.getElementById("c")
+const ctx = canvas.getContext("2d")
+
+function resize(){
+  canvas.width = innerWidth
+  canvas.height = innerHeight
+}
+resize()
+addEventListener("resize",resize)
+
+
+/* -------------------------------
+   Rope physics (Verlet)
+--------------------------------*/
+
+class Point{
+  constructor(x,y,pinned=false){
+    this.x=x
+    this.y=y
+    this.oldx=x
+    this.oldy=y
+    this.pinned=pinned
+  }
+}
+
+class Stick{
+  constructor(p0,p1){
+    this.p0=p0
+    this.p1=p1
+    this.length=Math.hypot(p1.x-p0.x,p1.y-p0.y)
+  }
+}
+
+const points=[]
+const sticks=[]
+
+const segments=20
+const spacing=20
+
+for(let i=0;i<segments;i++){
+
+  const p=new Point(
+    canvas.width/2,
+    100+i*spacing,
+    i===0
+  )
+
+  points.push(p)
+
+  if(i>0){
+    sticks.push(new Stick(points[i-1],p))
+  }
+
+}
+
+
+/* -------------------------------
+   accelerometer gravity
+--------------------------------*/
+
+let gravityX=0
+let gravityY=0.5
+
+function handleMotion(e){
+
+  const ax=e.accelerationIncludingGravity.x
+  const ay=e.accelerationIncludingGravity.y
+
+  gravityX=ax*0.05
+  gravityY=-ay*0.05
+}
+
+document.getElementById("enable").onclick=()=>{
+
+  if(typeof DeviceMotionEvent.requestPermission==="function"){
+
+    DeviceMotionEvent.requestPermission()
+      .then(res=>{
+        if(res==="granted"){
+          window.addEventListener("devicemotion",handleMotion)
+        }
+      })
+
+  }else{
+    window.addEventListener("devicemotion",handleMotion)
+  }
+
+}
+
+
+/* -------------------------------
+   mouse interaction
+--------------------------------*/
+
+let drag=null
+
+canvas.onpointerdown=e=>{
+
+  let min=30
+
+  for(let p of points){
+
+    const d=Math.hypot(p.x-e.clientX,p.y-e.clientY)
+
+    if(d<min){
+      drag=p
+      break
+    }
+
+  }
+
+}
+
+canvas.onpointermove=e=>{
+  if(drag){
+    drag.x=e.clientX
+    drag.y=e.clientY
+  }
+}
+
+canvas.onpointerup=()=>drag=null
+
+
+/* -------------------------------
+   physics update
+--------------------------------*/
+
+function update(){
+
+  for(let p of points){
+
+    if(p.pinned) continue
+
+    let vx=p.x-p.oldx
+    let vy=p.y-p.oldy
+
+    p.oldx=p.x
+    p.oldy=p.y
+
+    p.x+=vx+gravityX
+    p.y+=vy+gravityY
+
+  }
+
+  for(let i=0;i<5;i++){
+
+    for(let s of sticks){
+
+      let dx=s.p1.x-s.p0.x
+      let dy=s.p1.y-s.p0.y
+
+      let dist=Math.hypot(dx,dy)
+      let diff=(dist-s.length)/dist
+
+      let offx=dx*0.5*diff
+      let offy=dy*0.5*diff
+
+      if(!s.p0.pinned){
+        s.p0.x+=offx
+        s.p0.y+=offy
+      }
+
+      if(!s.p1.pinned){
+        s.p1.x-=offx
+        s.p1.y-=offy
+      }
+
+    }
+
+  }
+
+}
+
+
+/* -------------------------------
+   draw
+--------------------------------*/
+
+function draw(){
+
+  ctx.clearRect(0,0,canvas.width,canvas.height)
+
+  ctx.lineWidth=3
+  ctx.strokeStyle="white"
+
+  ctx.beginPath()
+
+  for(let s of sticks){
+
+    ctx.moveTo(s.p0.x,s.p0.y)
+    ctx.lineTo(s.p1.x,s.p1.y)
+
+  }
+
+  ctx.stroke()
+
+}
+
+
+/* -------------------------------
+   loop
+--------------------------------*/
+
+function loop(){
+
+  update()
+  draw()
+  requestAnimationFrame(loop)
+
+}
+
+loop()
+
+</script>
+</body>
+</html>
