@@ -436,17 +436,20 @@ async function loadSVGSlides(){
 
   }
 
+  // 👇 теперь SVG точно в DOM
+  replaceGuestText();
+
 }
 
-loadSVGSlides();
+function replaceGuestText(){
 
-const params = new URLSearchParams(window.location.search);
-const guestText = params.get("guest");
+  const params = new URLSearchParams(window.location.search);
+  const guestText = params.get("guest");
 
-if (guestText) {
-  alert(guestText);
+  if (!guestText) return;
+
   const tspans = document.querySelectorAll(".svg-slide tspan");
-  alert(tspans.length);
+
   tspans.forEach(el => {
     if (el.textContent.trim() === "Дорогие и") {
       el.textContent = guestText;
@@ -454,6 +457,8 @@ if (guestText) {
   });
 
 }
+
+loadSVGSlides();
   
   
 </script>
