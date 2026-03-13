@@ -3,26 +3,22 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
-<title>Rope — fullscreen, drag end follows finger</title>
+<title>Rope — min bend radius (2×width)</title>
 <style>
-  /* Полноэкранная страница, без скролла */
   html, body {
-    height: 100%;
-    margin: 0;
-    background: #f3e6d3; /* бежевый фон */
-    overscroll-behavior: none; /* отключаем pull-to-refresh в современных браузерах */
-    -webkit-overflow-scrolling: auto;
-    touch-action: none; /* предотвращаем браузерные жесты */
+    height:100%;
+    margin:0;
+    background:#f3e6d3;
+    overscroll-behavior: none;
+    touch-action: none;
     user-select: none;
     -webkit-user-select: none;
   }
-
-  /* canvas занимает весь экран */
   canvas {
-    display: block;
-    width: 100%;
-    height: 100vh;
-    touch-action: none; /* чтобы pointer события не блокировались */
+    display:block;
+    width:100%;
+    height:100vh;
+    touch-action: none;
   }
 </style>
 </head>
@@ -30,16 +26,14 @@
 <canvas id="c"></canvas>
 
 <script>
-/* ====== Setup canvas (HiDPI aware) ====== */
+/* ===== HiDPI canvas ===== */
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d', { alpha: false });
 
 function resize() {
   const dpr = window.devicePixelRatio || 1;
-  // full CSS size
   canvas.style.width = innerWidth + 'px';
   canvas.style.height = innerHeight + 'px';
-  // actual pixel buffer
   canvas.width = Math.max(1, Math.floor(innerWidth * dpr));
   canvas.height = Math.max(1, Math.floor(innerHeight * dpr));
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -47,22 +41,22 @@ function resize() {
 addEventListener('resize', resize);
 resize();
 
-/* ====== Verlet physics structures ====== */
+/* ===== Verlet structures ===== */
 class Point {
-  constructor(x, y, pinned = false) {
+  constructor(x,y,pinned=false){
     this.x = x; this.y = y;
     this.oldx = x; this.oldy = y;
     this.pinned = pinned;
   }
 }
 class Stick {
-  constructor(a, b) {
+  constructor(a,b){
     this.p0 = a; this.p1 = b;
     this.length = Math.hypot(a.x - b.x, a.y - b.y);
   }
 }
 
-/* ====== Rope params (shorter, stiffer) ====== */
+/* ===== Rope params ===== */
 let segments = 18;
 let spacing = 20;
 let points = [];
@@ -75,12 +69,14 @@ function buildRope() {
   for (let i = 0; i < segments; i++) {
     const p = new Point(anchorX, anchorY + i * spacing, i === 0);
     points.push(p);
-    if (i > 0) sticks.push(new Stick(points[i - 1], p));
+    if (i > 0) sticks.push(new Stick(points[i-1], points[i]));
   }
 }
 buildRope();
 
-/* ====== Physics params ====== */
+/* ===== Visual / physics params ===== */
+const ropeWidth = 25;           // толщина ленты (используется для min-radius)
+const Rmin = 2 * ropeWidth;     // минимальный радиус изгиба = 2 ширины ленты
 const gravityY = 0.7;
 let swayX = 0;
 let targetSwayX = 0;
@@ -89,13 +85,16 @@ const swayWeightBase = 0.5;
 const velocityDamping = 0.995;
 const constraintIters = 12;
 
-/* ====== Accelerometer auto-enable ====== */
+/* approx discrete min angle: minAngle ≈ spacing / Rmin (radians) */
+const minAngle = Math.max(0.01, spacing / Rmin); // lower bound to avoid zero
+
+/* ===== Accelerometer auto-enable ===== */
 function handleMotion(e) {
   const ax = e.accelerationIncludingGravity?.x || 0;
   targetSwayX = -ax * swayScale;
 }
-function enableMotion() {
-  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+function enableMotion(){
+  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function'){
     DeviceMotionEvent.requestPermission()
       .then(r => { if (r === 'granted') window.addEventListener('devicemotion', handleMotion); })
       .catch(() => window.addEventListener('devicemotion', handleMotion));
@@ -105,82 +104,154 @@ function enableMotion() {
 }
 enableMotion();
 
-/* ====== Drag: только за конец, при захвате конец следует за пальцем точно ====== */
+/* ===== Drag: only end, exact follow ===== */
 let drag = null;
-const DRAG_THRESHOLD = 60; // пиксели — радиус захвата конца
+const DRAG_THRESHOLD = 60;
 
-canvas.addEventListener('pointerdown', e => {
-  // проверяем только последний сегмент (свисающий край)
+canvas.addEventListener('pointerdown', e=>{
   const end = points[points.length - 1];
   const d = Math.hypot(end.x - e.clientX, end.y - e.clientY);
   if (d <= DRAG_THRESHOLD) {
     drag = end;
-    // чтобы никуда не "телепортировало", сразу синхронизируем oldx/oldy
-    drag.x = e.clientX;
-    drag.y = e.clientY;
-    drag.oldx = e.clientX;
-    drag.oldy = e.clientY;
-    // предотвращаем системные действия (особенно на iOS/Android)
+    drag.x = e.clientX; drag.y = e.clientY;
+    drag.oldx = e.clientX; drag.oldy = e.clientY;
     e.preventDefault();
   }
 }, { passive: false });
 
-canvas.addEventListener('pointermove', e => {
+canvas.addEventListener('pointermove', e=>{
   if (drag) {
-    // при каждом движении делаем конец точно следовать за пальцем,
-    // обновляя и старую позицию — убираем инерцию при захвате.
-    drag.x = e.clientX;
-    drag.y = e.clientY;
-    drag.oldx = e.clientX;
-    drag.oldy = e.clientY;
+    drag.x = e.clientX; drag.y = e.clientY;
+    drag.oldx = e.clientX; drag.oldy = e.clientY;
   }
 });
-
-function endDrag() { drag = null; }
+function endDrag(){ drag = null; }
 canvas.addEventListener('pointerup', endDrag);
 canvas.addEventListener('pointercancel', endDrag);
 window.addEventListener('blur', endDrag);
 
-/* ====== Disable pull-to-refresh on touch devices, но позволяем drag */
-(function disablePullToRefresh() {
-  // Для современных браузеров overscroll-behavior в CSS уже работает.
-  // Для iOS/Safari и старых реализаций — блокируем touchmove, если не тащим за конец.
-  function touchMoveHandler(e) {
-    if (!drag) {
-      // блокируем дефолтные жесты (pull-to-refresh)
-      e.preventDefault();
-    }
-    // если drag — не предотвращаем, чтобы pointer события работали
+/* Prevent pull-to-refresh on older iOS by blocking touchmove when not dragging */
+(function disablePTR() {
+  function tHandler(e){
+    if (!drag) e.preventDefault();
   }
-  // must be non-passive to preventDefault
-  document.addEventListener('touchmove', touchMoveHandler, { passive: false });
+  document.addEventListener('touchmove', tHandler, { passive: false });
 })();
 
-/* ====== Physics update ====== */
+/* ===== Helpers ===== */
+function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+function normalize(x,y){
+  const l = Math.hypot(x,y);
+  if (l === 0) return {x:0,y:0, l:0};
+  return {x:x/l, y:y/l, l};
+}
+function dot(ax,ay, bx,by){ return ax*bx + ay*by; }
+function rotate(x,y,theta){
+  const c = Math.cos(theta), s = Math.sin(theta);
+  return {x: x*c - y*s, y: x*s + y*c};
+}
+
+/* ===== Enforce minimum bend radius / angle =====
+   For each internal point B (with neighbors A and C), if angle(A-B-C) < minAngle:
+   we reposition A and C symmetrically (keeping their lengths from B) so that angle == minAngle.
+   We only do this when both neighbors are NOT pinned (to avoid moving anchors).
+*/
+function enforceMinBend() {
+  const n = points.length;
+  // for i = 1 .. n-2 (internal points)
+  for (let i = 1; i < n - 1; i++) {
+    const B = points[i];
+    const A = points[i - 1];
+    const C = points[i + 1];
+
+    // skip if either neighbor pinned (simple rule)
+    if (A.pinned || C.pinned) continue;
+
+    // vectors from B
+    const ax = A.x - B.x, ay = A.y - B.y;
+    const cx = C.x - B.x, cy = C.y - B.y;
+
+    const na = Math.hypot(ax, ay);
+    const nc = Math.hypot(cx, cy);
+    if (na === 0 || nc === 0) continue;
+
+    // current angle between vectors
+    let cosTheta = dot(ax,ay, cx,cy) / (na * nc);
+    cosTheta = clamp(cosTheta, -1, 1);
+    const theta = Math.acos(cosTheta);
+
+    if (theta < minAngle) {
+      // compute bisector direction (sum of unit vectors)
+      const ua = {x: ax/na, y: ay/na};
+      const uc = {x: cx/nc, y: cy/nc};
+      let bisX = ua.x + uc.x;
+      let bisY = ua.y + uc.y;
+      const bisL = Math.hypot(bisX, bisY);
+
+      // if vectors are nearly opposite (bisector very small), use perpendicular to one
+      if (bisL < 1e-6) {
+        // choose bisector perpendicular to A
+        bisX = -ua.y; bisY = ua.x;
+      } else {
+        bisX /= bisL; bisY /= bisL;
+      }
+
+      // decide rotation direction: ensure rotated directions approximate original ones
+      // we'll create two unit vectors rotated around bisector by +/- minAngle/2
+      const half = minAngle / 2;
+
+      // create an orthogonal basis in plane: take bisector as local x axis,
+      // but rotation of a vector around bisector in 2D is simpler: we will build new unit vectors
+      // by rotating bisector by +/- half, then ensure they point roughly towards original A and C.
+
+      // candidate directions
+      const cand1 = rotate(bisX, bisY, +half);
+      const cand2 = rotate(bisX, bisY, -half);
+
+      // choose which candidate corresponds to A and which to C by checking dot product with original unit vectors
+      // if cand1 more aligned with ua -> assign to A, else swap
+      const dot1A = dot(cand1.x, cand1.y, ua.x, ua.y);
+      const dot1C = dot(cand1.x, cand1.y, uc.x, uc.y);
+
+      let dirA, dirC;
+      if (dot1A >= dot1C) {
+        dirA = cand1;
+        dirC = cand2;
+      } else {
+        dirA = cand2;
+        dirC = cand1;
+      }
+
+      // set new positions for A and C preserving their distances na, nc from B
+      A.x = B.x + dirA.x * na;
+      A.y = B.y + dirA.y * na;
+      C.x = B.x + dirC.x * nc;
+      C.y = B.y + dirC.y * nc;
+    }
+  }
+}
+
+/* ===== Physics update ===== */
 function updatePhysics() {
-  // сглаживание бокового сдвига
+  // smooth sway
   swayX += (targetSwayX - swayX) * 0.12;
 
   for (let i = 0; i < points.length; i++) {
     const p = points[i];
     if (p.pinned) continue;
 
-    // интеграция Verlet
     const vx = (p.x - p.oldx) * velocityDamping;
     const vy = (p.y - p.oldy) * velocityDamping;
 
-    p.oldx = p.x;
-    p.oldy = p.y;
-
+    p.oldx = p.x; p.oldy = p.y;
     p.x += vx;
     p.y += vy + gravityY;
 
-    // боковое влияние небольшое; чуть сильнее к низу
     const weight = i / (points.length - 1);
     p.x += swayX * (swayWeightBase + 0.1 * weight);
   }
 
-  // ограничения (много итераций для жёсткости)
+  // constraints
   for (let iter = 0; iter < constraintIters; iter++) {
     for (let s of sticks) {
       const dx = s.p1.x - s.p0.x;
@@ -192,31 +263,28 @@ function updatePhysics() {
       const offy = dy * 0.5 * diff;
 
       if (!s.p0.pinned) {
-        s.p0.x += offx;
-        s.p0.y += offy;
+        s.p0.x += offx; s.p0.y += offy;
       } else {
-        s.p0.x = anchorX;
-        s.p0.y = anchorY;
+        s.p0.x = anchorX; s.p0.y = anchorY;
       }
       if (!s.p1.pinned) {
-        s.p1.x -= offx;
-        s.p1.y -= offy;
+        s.p1.x -= offx; s.p1.y -= offy;
       }
     }
-    // держим верхнюю точку жёстко
-    points[0].x = anchorX;
-    points[0].y = anchorY;
+    // enforce top anchor
+    points[0].x = anchorX; points[0].y = anchorY;
   }
+
+  // enforce minimum bend AFTER satisfying basic stick constraints (helps stability)
+  enforceMinBend();
 }
 
-/* ====== Draw (thick red rope, no tail) ====== */
+/* ===== Draw ===== */
 function draw() {
-  // фон
   ctx.fillStyle = '#f3e6d3';
   ctx.fillRect(0, 0, innerWidth, innerHeight);
 
-  // толстая красная верёвка
-  ctx.lineWidth = 25; // 5x
+  ctx.lineWidth = ropeWidth;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.strokeStyle = '#c62828';
@@ -227,40 +295,38 @@ function draw() {
   ctx.beginPath();
   ctx.moveTo(points[0].x, points[0].y);
   for (let i = 1; i < points.length - 1; i++) {
-    const cx = (points[i].x + points[i + 1].x) / 2;
-    const cy = (points[i].y + points[i + 1].y) / 2;
+    const cx = (points[i].x + points[i+1].x) / 2;
+    const cy = (points[i].y + points[i+1].y) / 2;
     ctx.quadraticCurveTo(points[i].x, points[i].y, cx, cy);
   }
   const last = points[points.length - 1];
   ctx.lineTo(last.x, last.y);
   ctx.stroke();
 
-  // небольшой узел/точка в конце
   ctx.shadowBlur = 0;
   ctx.fillStyle = '#8b1f1f';
   ctx.beginPath();
-  ctx.arc(last.x, last.y, 6, 0, Math.PI * 2);
+  ctx.arc(last.x, last.y, 6, 0, Math.PI*2);
   ctx.fill();
 
-  // индикатор области захвата (полупрозрачный круг) — полезный UX
+  // grab area hint (optional)
   ctx.fillStyle = 'rgba(0,0,0,0.06)';
   ctx.beginPath();
-  ctx.arc(last.x, last.y, DRAG_THRESHOLD, 0, Math.PI * 2);
+  ctx.arc(last.x, last.y, DRAG_THRESHOLD, 0, Math.PI*2);
   ctx.fill();
 }
 
-/* ====== Main loop ====== */
-function loop() {
+/* ===== Loop ===== */
+function loop(){
   updatePhysics();
   draw();
   requestAnimationFrame(loop);
 }
 loop();
 
-/* ====== Keep anchor centered on resize (optional) ====== */
+/* keep anchor centered on resize */
 addEventListener('resize', () => {
   anchorX = innerWidth / 2;
-  // rebuild rope so anchor positions align with new size
   buildRope();
   resize();
 });
