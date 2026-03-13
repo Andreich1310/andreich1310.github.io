@@ -43,8 +43,10 @@ const segments=5
 const totalLength=360
 const spacing=totalLength/segments
 
-const minAngle=120*Math.PI/180
-const fixedAngle=120*Math.PI/180
+/* НОВЫЕ УГЛЫ */
+
+const fixedAngle=100*Math.PI/180
+const minAngle=160*Math.PI/180
 
 let points=[]
 let sticks=[]
@@ -170,7 +172,7 @@ s.p1.y-=offy
 
 }
 
-/* angle constraint */
+/* ограничение угла */
 
 function solveAngles(){
 
@@ -274,7 +276,7 @@ solveSticks()
 solveAngles()
 }
 
-/* фиксируем первый сегмент */
+/* фикс первого сегмента */
 
 lockFirstSegment()
 
@@ -293,7 +295,6 @@ ctx.lineWidth=30
 ctx.strokeStyle="rgba(0,0,0,0.15)"
 
 ctx.beginPath()
-
 ctx.moveTo(points[0].x+2,points[0].y+2)
 
 for(let i=1;i<points.length-1;i++){
@@ -306,7 +307,6 @@ ctx.quadraticCurveTo(points[i].x+2,points[i].y+2,cx+2,cy+2)
 }
 
 ctx.lineTo(points.at(-1).x+2,points.at(-1).y+2)
-
 ctx.stroke()
 
 /* ribbon */
@@ -315,7 +315,6 @@ ctx.lineWidth=26
 ctx.strokeStyle="#c62828"
 
 ctx.beginPath()
-
 ctx.moveTo(points[0].x,points[0].y)
 
 for(let i=1;i<points.length-1;i++){
@@ -328,7 +327,6 @@ ctx.quadraticCurveTo(points[i].x,points[i].y,cx,cy)
 }
 
 ctx.lineTo(points.at(-1).x,points.at(-1).y)
-
 ctx.stroke()
 
 /* highlight */
@@ -337,7 +335,6 @@ ctx.lineWidth=8
 ctx.strokeStyle="rgba(255,255,255,0.35)"
 
 ctx.beginPath()
-
 ctx.moveTo(points[0].x-3,points[0].y-3)
 
 for(let i=1;i<points.length-1;i++){
@@ -350,7 +347,6 @@ ctx.quadraticCurveTo(points[i].x-3,points[i].y-3,cx-3,cy-3)
 }
 
 ctx.lineTo(points.at(-1).x-3,points.at(-1).y-3)
-
 ctx.stroke()
 
 }
