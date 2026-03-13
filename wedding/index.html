@@ -454,6 +454,10 @@ function replaceGuestText(){
     if (el.textContent.trim() === "Дорогие и") {
       el.textContent = guestText;
     }
+    if (el.textContent.trim() === "любимые Гости!") {
+      el.textContent = "";
+    }
+    
   });
 
 }
