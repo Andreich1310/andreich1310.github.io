@@ -445,7 +445,8 @@ function replaceGuestText(){
 
   const params = new URLSearchParams(window.location.search);
   const guestText = params.get("guest");
-
+  const guestText2 = params.get("guest2");
+  
   if (!guestText) return;
 
   const tspans = document.querySelectorAll(".svg-slide tspan");
@@ -455,7 +456,7 @@ function replaceGuestText(){
       el.textContent = guestText;
     }
     if (el.textContent.trim() === "любимые Гости!") {
-      el.textContent = "";
+      el.textContent = guestText2;
     }
     
   });
