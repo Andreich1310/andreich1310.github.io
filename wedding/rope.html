@@ -2,334 +2,222 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
-<title>Rope — stable, soft max-bend</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+
 <style>
-  html, body {
-    height:100%;
-    margin:0;
-    background:#f3e6d3;
-    overscroll-behavior: none;
-    touch-action: none;
-    user-select: none;
-    -webkit-user-select: none;
-  }
-  canvas {
-    display:block;
-    width:100%;
-    height:100vh;
-    touch-action: none;
-  }
+html,body{
+margin:0;
+padding:0;
+height:100%;
+overflow:hidden;
+background:#f3e6d3;
+touch-action:none;
+overscroll-behavior:none;
+}
+
+canvas{
+display:block;
+width:100vw;
+height:100vh;
+}
 </style>
 </head>
+
 <body>
 <canvas id="c"></canvas>
 
 <script>
-/* ===== HiDPI canvas ===== */
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d', { alpha: false });
+const canvas = document.getElementById('c')
+const ctx = canvas.getContext('2d')
 
-function resize() {
-  const dpr = window.devicePixelRatio || 1;
-  canvas.style.width = innerWidth + 'px';
-  canvas.style.height = innerHeight + 'px';
-  canvas.width = Math.max(1, Math.floor(innerWidth * dpr));
-  canvas.height = Math.max(1, Math.floor(innerHeight * dpr));
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+function resize(){
+canvas.width = innerWidth
+canvas.height = innerHeight
 }
-addEventListener('resize', resize);
-resize();
+addEventListener('resize',resize)
+resize()
 
-/* ===== Verlet structures ===== */
-class Point {
-  constructor(x,y,pinned=false){
-    this.x = x; this.y = y;
-    this.oldx = x; this.oldy = y;
-    this.pinned = pinned;
-  }
+/* ---------- rope parameters ---------- */
+
+const ropeLength = 360
+const segments = 5
+const spacing = ropeLength/(segments-1)
+
+const ropeWidth = 30
+
+let anchorX
+let anchorY = 120
+
+/* ---------- physics ---------- */
+
+class Point{
+constructor(x,y,pinned=false){
+this.x=x
+this.y=y
+this.oldx=x
+this.oldy=y
+this.pinned=pinned
 }
-class Stick {
-  constructor(a,b){
-    this.p0 = a; this.p1 = b;
-    this.length = Math.hypot(a.x - b.x, a.y - b.y);
-  }
-}
-
-/* ===== Rope params ===== */
-let segments = 18;
-let spacing = 20;
-let points = [];
-let sticks = [];
-let anchorX = innerWidth / 2;
-let anchorY = 100;
-
-function buildRope() {
-  points = []; sticks = [];
-  for (let i = 0; i < segments; i++) {
-    const p = new Point(anchorX, anchorY + i * spacing, i === 0);
-    points.push(p);
-    if (i > 0) sticks.push(new Stick(points[i-1], points[i]));
-  }
-}
-buildRope();
-
-/* ===== Visual / physics params ===== */
-const ropeWidth = 25;              // толщина ленты
-function computeRmin() { return spacing * Math.max(1, segments - 1); } // Rmin = total length
-
-/* compute maxAngle from Rmin (approx: spacing / Rmin), but DO NOT let it be insanely tiny;
-   we will *soft-enforce* the maxAngle so very small values still behave stably */
-function computeMaxAngle() {
-  const R = computeRmin();
-  const raw = spacing / Math.max(1, R);
-  return Math.max(0.002, raw); // lower bound for numeric stability (~0.11°)
 }
 
-const gravityY = 0.7;
-let swayX = 0;
-let targetSwayX = 0;
-// уменьшили влияние акселерометра для более стабильного поведения
-let swayScale = 0.018;
-const swayWeightBase = 0.45;
-// чуть больше демпфирования
-const velocityDamping = 0.997;
-let constraintIters = 8; // уменьшили итерации (комбинируем с мягкой коррекцией)
-
-/* ===== Accelerometer auto-enable ===== */
-function handleMotion(e) {
-  const ax = e.accelerationIncludingGravity?.x || 0;
-  targetSwayX = -ax * swayScale;
+class Stick{
+constructor(a,b){
+this.a=a
+this.b=b
+this.length=Math.hypot(a.x-b.x,a.y-b.y)
 }
-function enableMotion(){
-  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function'){
-    DeviceMotionEvent.requestPermission()
-      .then(r => { if (r === 'granted') window.addEventListener('devicemotion', handleMotion); })
-      .catch(() => window.addEventListener('devicemotion', handleMotion));
-  } else {
-    window.addEventListener('devicemotion', handleMotion);
-  }
-}
-enableMotion();
-
-/* ===== Drag: only end, exact follow ===== */
-let drag = null;
-const DRAG_THRESHOLD = 60;
-
-canvas.addEventListener('pointerdown', e=>{
-  const end = points[points.length - 1];
-  const d = Math.hypot(end.x - e.clientX, end.y - e.clientY);
-  if (d <= DRAG_THRESHOLD) {
-    drag = end;
-    drag.x = e.clientX; drag.y = e.clientY;
-    drag.oldx = e.clientX; drag.oldy = e.clientY;
-    e.preventDefault();
-  }
-}, { passive: false });
-
-canvas.addEventListener('pointermove', e=>{
-  if (drag) {
-    // конец следует точно за пальцем (обновляем старую позицию — нет инерции при удержании)
-    drag.x = e.clientX; drag.y = e.clientY;
-    drag.oldx = e.clientX; drag.oldy = e.clientY;
-  }
-});
-function endDrag(){ drag = null; }
-canvas.addEventListener('pointerup', endDrag);
-canvas.addEventListener('pointercancel', endDrag);
-window.addEventListener('blur', endDrag);
-
-/* Prevent pull-to-refresh on older iOS by blocking touchmove when not dragging */
-(function disablePTR() {
-  function tHandler(e){
-    if (!drag) e.preventDefault();
-  }
-  document.addEventListener('touchmove', tHandler, { passive: false });
-})();
-
-/* ===== Helpers ===== */
-function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
-function dot(ax,ay, bx,by){ return ax*bx + ay*by; }
-function rotate(x,y,theta){
-  const c = Math.cos(theta), s = Math.sin(theta);
-  return {x: x*c - y*s, y: x*s + y*c};
 }
 
-/* ===== Soft max-bend enforcement =====
-   Instead of snapping A/C instantly, we compute target positions
-   that would satisfy maxAngle and move current positions *partially*
-   toward those targets. This avoids strong impulses and resonance.
-*/
-function enforceMaxBendSoft(maxAngle) {
-  const n = points.length;
-  for (let i = 1; i < n - 1; i++) {
-    const B = points[i];
-    const A = points[i - 1];
-    const C = points[i + 1];
+let points=[]
+let sticks=[]
 
-    let ax = A.x - B.x, ay = A.y - B.y;
-    let cx = C.x - B.x, cy = C.y - B.y;
+function build(){
+anchorX = canvas.width/2
+points=[]
+sticks=[]
 
-    const na = Math.hypot(ax, ay);
-    const nc = Math.hypot(cx, cy);
-    if (na === 0 || nc === 0) continue;
+for(let i=0;i<segments;i++){
+const p=new Point(anchorX,anchorY+i*spacing,i===0)
+points.push(p)
+if(i>0) sticks.push(new Stick(points[i-1],p))
+}
+}
+build()
 
-    const ua = {x: ax/na, y: ay/na};
-    const uc = {x: cx/nc, y: cy/nc};
+/* ---------- accelerometer sway ---------- */
 
-    // current angle
-    let cosTheta = clamp(dot(ua.x,ua.y, uc.x,uc.y), -1, 1);
-    let theta = Math.acos(cosTheta);
+let sway=0
+let targetSway=0
 
-    if (theta > maxAngle + 1e-6) {
-      // bisector
-      let bisX = ua.x + uc.x;
-      let bisY = ua.y + uc.y;
-      let bisL = Math.hypot(bisX, bisY);
-      if (bisL < 1e-6) {
-        bisX = -ua.y; bisY = ua.x;
-        bisL = Math.hypot(bisX, bisY);
-      }
-      bisX /= bisL; bisY /= bisL;
-
-      const half = maxAngle / 2;
-      const cand1 = rotate(bisX, bisY, +half);
-      const cand2 = rotate(bisX, bisY, -half);
-
-      const d1 = dot(cand1.x, cand1.y, ua.x, ua.y);
-      const d2 = dot(cand2.x, cand2.y, ua.x, ua.y);
-      let dirA = d1 > d2 ? cand1 : cand2;
-      let dirC = (dirA === cand1) ? cand2 : cand1;
-
-      // target positions preserving distances
-      const txA = B.x + dirA.x * na;
-      const tyA = B.y + dirA.y * na;
-      const txC = B.x + dirC.x * nc;
-      const tyC = B.y + dirC.y * nc;
-
-      // alpha: how strongly to move towards target (adaptive)
-      // proportion grows with severity of violation
-      const rel = clamp((theta - maxAngle) / (Math.PI - maxAngle), 0, 1);
-      const alpha = clamp(0.12 + 0.5 * rel, 0.08, 0.6); // between 0.08 and 0.6
-
-      // apply partial moves, but only to movable points
-      if (!A.pinned) {
-        A.x += (txA - A.x) * alpha;
-        A.y += (tyA - A.y) * alpha;
-        // update oldpos to avoid large velocity injection
-        A.oldx = A.x; A.oldy = A.y;
-      }
-      if (!C.pinned) {
-        C.x += (txC - C.x) * alpha;
-        C.y += (tyC - C.y) * alpha;
-        C.oldx = C.x; C.oldy = C.y;
-      }
-      // if both neighbors pinned -> nudge B slightly along bisector (small alpha)
-      if (A.pinned && C.pinned) {
-        const nudge = 0.06 * spacing;
-        B.x += bisX * nudge;
-        B.y += bisY * nudge;
-        B.oldx = B.x; B.oldy = B.y;
-      }
-    }
-  }
+function motion(e){
+const ax=e.accelerationIncludingGravity?.x||0
+targetSway=ax*0.02
 }
 
-/* ===== Physics update ===== */
-function updatePhysics() {
-  // smooth sway
-  swayX += (targetSwayX - swayX) * 0.12;
+window.addEventListener("devicemotion",motion)
 
-  for (let i = 0; i < points.length; i++) {
-    const p = points[i];
-    if (p.pinned) continue;
+/* ---------- drag ---------- */
 
-    const vx = (p.x - p.oldx) * velocityDamping;
-    const vy = (p.y - p.oldy) * velocityDamping;
+let drag=false
 
-    p.oldx = p.x; p.oldy = p.y;
-    p.x += vx;
-    p.y += vy + gravityY;
+canvas.addEventListener("pointerdown",e=>{
+const end=points[points.length-1]
+const d=Math.hypot(e.clientX-end.x,e.clientY-end.y)
 
-    const weight = i / (points.length - 1);
-    p.x += swayX * (swayWeightBase + 0.1 * weight);
-  }
+if(d<80){
+drag=true
+end.x=e.clientX
+end.y=e.clientY
+end.oldx=end.x
+end.oldy=end.y
+}
+})
 
-  // basic stick constraints (fewer iters -> more stable with soft bend enforcement)
-  for (let iter = 0; iter < constraintIters; iter++) {
-    for (let s of sticks) {
-      const dx = s.p1.x - s.p0.x;
-      const dy = s.p1.y - s.p0.y;
-      let dist = Math.hypot(dx, dy);
-      if (dist === 0) continue;
-      const diff = (dist - s.length) / dist;
-      const offx = dx * 0.5 * diff;
-      const offy = dy * 0.5 * diff;
+canvas.addEventListener("pointermove",e=>{
+if(!drag)return
+const end=points[points.length-1]
 
-      if (!s.p0.pinned) { s.p0.x += offx; s.p0.y += offy; }
-      else { s.p0.x = anchorX; s.p0.y = anchorY; }
-      if (!s.p1.pinned) { s.p1.x -= offx; s.p1.y -= offy; }
-    }
-    // enforce anchor
-    points[0].x = anchorX; points[0].y = anchorY;
-  }
+end.x=e.clientX
+end.y=e.clientY
+})
 
-  // soft max-bend enforcement (single pass, but soft)
-  const maxAngle = computeMaxAngle();
-  enforceMaxBendSoft(maxAngle);
+canvas.addEventListener("pointerup",()=>drag=false)
+canvas.addEventListener("pointercancel",()=>drag=false)
+
+/* ---------- physics ---------- */
+
+const gravity=0.6
+const damping=0.995
+const constraintPasses=20
+
+function update(){
+
+sway+=(targetSway-sway)*0.15
+
+for(let i=0;i<points.length;i++){
+const p=points[i]
+if(p.pinned) continue
+
+let vx=(p.x-p.oldx)*damping
+let vy=(p.y-p.oldy)*damping
+
+p.oldx=p.x
+p.oldy=p.y
+
+p.x+=vx
+p.y+=vy+gravity
+
+const weight=i/(points.length-1)
+p.x+=sway*weight*10
 }
 
-/* ===== Draw ===== */
-function draw() {
-  ctx.fillStyle = '#f3e6d3';
-  ctx.fillRect(0, 0, innerWidth, innerHeight);
+/* sticks */
 
-  ctx.lineWidth = ropeWidth;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.strokeStyle = '#c62828';
-  ctx.shadowColor = 'rgba(0,0,0,0.12)';
-  ctx.shadowBlur = 8;
-  ctx.shadowOffsetY = 2;
+for(let k=0;k<constraintPasses;k++){
 
-  ctx.beginPath();
-  ctx.moveTo(points[0].x, points[0].y);
-  for (let i = 1; i < points.length - 1; i++) {
-    const cx = (points[i].x + points[i+1].x) / 2;
-    const cy = (points[i].y + points[i+1].y) / 2;
-    ctx.quadraticCurveTo(points[i].x, points[i].y, cx, cy);
-  }
-  const last = points[points.length - 1];
-  ctx.lineTo(last.x, last.y);
-  ctx.stroke();
+for(const s of sticks){
 
-  ctx.shadowBlur = 0;
-  ctx.fillStyle = '#8b1f1f';
-  ctx.beginPath();
-  ctx.arc(last.x, last.y, 6, 0, Math.PI*2);
-  ctx.fill();
+const dx=s.b.x-s.a.x
+const dy=s.b.y-s.a.y
 
-  // subtle grab hint
-  ctx.fillStyle = 'rgba(0,0,0,0.06)';
-  ctx.beginPath();
-  ctx.arc(last.x, last.y, DRAG_THRESHOLD, 0, Math.PI*2);
-  ctx.fill();
+const dist=Math.hypot(dx,dy)
+const diff=(dist-s.length)/dist
+
+const offx=dx*0.5*diff
+const offy=dy*0.5*diff
+
+if(!s.a.pinned){
+s.a.x+=offx
+s.a.y+=offy
 }
 
-/* ===== Loop ===== */
+if(!s.b.pinned || drag){
+s.b.x-=offx
+s.b.y-=offy
+}
+}
+
+points[0].x=anchorX
+points[0].y=anchorY
+}
+
+}
+
+/* ---------- draw ---------- */
+
+function draw(){
+
+ctx.fillStyle="#f3e6d3"
+ctx.fillRect(0,0,canvas.width,canvas.height)
+
+ctx.lineWidth=ropeWidth
+ctx.lineCap="round"
+ctx.lineJoin="round"
+ctx.strokeStyle="#c62828"
+
+ctx.beginPath()
+
+ctx.moveTo(points[0].x,points[0].y)
+
+for(let i=1;i<points.length;i++){
+ctx.lineTo(points[i].x,points[i].y)
+}
+
+ctx.stroke()
+
+}
+
+/* ---------- loop ---------- */
+
 function loop(){
-  updatePhysics();
-  draw();
-  requestAnimationFrame(loop);
-}
-loop();
 
-/* keep anchor & rope on resize */
-addEventListener('resize', () => {
-  anchorX = innerWidth / 2;
-  buildRope();
-  resize();
-});
+update()
+draw()
+
+requestAnimationFrame(loop)
+}
+
+loop()
 
 </script>
 </body>
