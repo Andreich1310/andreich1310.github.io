@@ -409,7 +409,7 @@ function onSliderPointerMove(e){
   if(currentSlide === slideCount - 1 && endMessage){
     // when dragging up beyond last slide, dy becomes negative -> overscroll positive
     const overscroll = Math.max(0, - (e.clientY - sStartY));
-    const scale = 1 + Math.min(overscroll / 300, 0.8);
+    const scale = 1 + Math.min(overscroll / 300, 0.4);
     endMessage.style.transform = `translateX(-50%) scale(${scale})`;
   }
   e.preventDefault && e.preventDefault();
