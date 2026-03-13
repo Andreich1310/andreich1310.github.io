@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Doors — JS-controlled 1-swipe slider</title>
+<title>Doors — hero JS-drag fixed</title>
 
 <style>
 :root{
@@ -23,10 +23,10 @@ html,body{
   margin:0;
   overflow:hidden;
   font-family: "WeddingFont";
-  background:#FAF6C9; /* базовый цвет страницы */
+  background:#FAF6C9;
 }
 
-/* HERO / DOORS (unchanged styling, minor tweaks) */
+/* HERO / DOORS */
 .hero{
   position:fixed;
   inset:0;
@@ -34,7 +34,8 @@ html,body{
   perspective:1000px;
   z-index:100;
   transition:opacity .35s cubic-bezier(.22,.61,.36,1);
-  touch-action:pan-y;
+  /* IMPORTANT: handle hero gestures in JS to ensure perfect follow — set to none */
+  touch-action:none;
 }
 
 .hero.dragging .door,
@@ -70,17 +71,17 @@ html,body{
 /* cinematic gap light */
 .gap-light{ position:absolute; left:50%; top:0; bottom:0; width:6px; transform:translateX(-50%); pointer-events:none; z-index:20; background: linear-gradient(180deg, rgba(255,245,220,0.95), rgba(255,230,160,0.6)); filter: blur(18px); opacity:0; transition: opacity .26s linear, width .26s linear; }
 
-/* SLIDER: now JS-controlled: overflow hidden, touch-action none */
+/* SLIDER: JS-controlled */
 .slider{
   position:relative;
   height:100vh;
-  overflow:hidden;       /* <- disable native scroll */
-  touch-action:none;     /* prevent default touch gestures */
+  overflow:hidden;
+  touch-action:none;
   -webkit-user-select:none;
   user-select:none;
 }
 
-/* slides container; we'll move this using transform: translateY */
+/* slides container */
 .slides{
   height:100%;
   width:100%;
@@ -88,22 +89,12 @@ html,body{
   will-change: transform;
 }
 
-/* each slide keeps 100vh */
-.slide{
-  height:100vh;
-  width:100%;
-}
-
-/* image fits */
+.slide{ height:100vh; width:100%; }
 .slide img{ width:100%; height:100%; object-fit:cover; display:block; }
 
-/* responsive tweaks */
 @media (max-width:520px){
   .door-shadow{ width:14vw; filter:blur(12px); } .inner-edge{ width:12px; } .door-shadow.left{ right:-10vw; } .door-shadow.right{ left:-10vw; } .gap-light{ width:10px; }
 }
-
-
-  
 </style>
 </head>
 
@@ -136,22 +127,17 @@ html,body{
   </div>
 </div>
 
-<!-- JS-controlled slider -->
 <div class="slider" id="slider" aria-hidden="true">
   <div class="slides" id="slides">
-    <section class="slide"><img src="slides/v0.47 + текст_1.svg" alt=""></section>
-    <section class="slide"><img src="slides/v0.47 + текст_2.svg" alt=""></section>
-    <section class="slide"><img src="slides/v0.47 + текст_3.svg" alt=""></section>
-    <section class="slide"><img src="slides/v0.47 + текст_4.svg" alt=""></section>
-    <section class="slide"><img src="slides/v0.47 + текст_5.svg" alt=""></section>
-    <section class="slide"><img src="slides/v0.47 + текст_6.svg" alt=""></section>
-    <section class="slide"><img src="slides/v0.47 + текст_7.svg" alt=""></section>
+    <section class="slide"><img src="center.svg" alt=""></section>
+    <section class="slide"><img src="Левая web.svg" alt=""></section>
+    <section class="slide"><img src="Правая web.svg" alt=""></section>
   </div>
 </div>
 
 <script>
 (function(){
-/* ---------------------- elements ---------------------- */
+/* ---------- elements ---------- */
 const hero = document.getElementById('hero');
 const gapLight = document.getElementById('gapLight');
 const leftDoor = document.getElementById('leftDoor');
@@ -169,54 +155,45 @@ const slidesWrap = document.getElementById('slides');
 const slides = Array.from(slidesWrap.querySelectorAll('.slide'));
 const slideCount = slides.length;
 
-/* ---------------------- settings ---------------------- */
-const SWIPE_DISTANCE_FACTOR = 0.12; // fraction of height for progress (hero)
-const SLIDE_SWIPE_THRESHOLD_PX = 60; // px to accept swipe for slide
-const SLIDE_ANIM_TIME = 420; // ms
+/* ---------- settings ---------- */
+const SWIPE_DISTANCE_FACTOR = 0.12;
+const SLIDE_SWIPE_THRESHOLD_PX = 60;
+const SLIDE_ANIM_TIME = 420;
 const IMAGE_Z_MULT = 20;
 const DISABLE_HERO_AT = 0.98;
 
-/* hero parameters kept from previous */
 const initialGap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gap-start')) || 0.5;
 const maxGap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gap-end')) || 50;
 const rot = 38;
 const FADE_START = 0.93;
 const FADE_END = 0.98;
 
-/* ---------------------- state ---------------------- */
-let progress = 0;                // hero progress
-let isDraggingHero = false;
-let startYHero = 0, startProgress = 0, lastMoveTime = 0, lastMoveY = 0, velocityHero = 0;
+/* ---------- state ---------- */
+let progress = 0;
 let rafId = 0, pendingProgress = 0;
-let heroVisible = true;
 let didVibrate = false;
 
-/* slider state */
+/* hero drag state (now handled on hero element) */
+let isDraggingHero = false;
+let startYHero = 0;
+let startProgress = 0;
+let lastMoveTime = 0;
+let lastMoveY = 0;
+let velocityHero = 0;
+
+/* slider state kept same as before */
 let currentSlide = 0;
-let locked = false;              // lock while slide animation
+let locked = false;
 let sliderDragging = false;
 let sStartY = 0, sStartTranslate = 0, sLastTime = 0, sLastY = 0, sVelocity = 0;
 
-/* utility */
 const vh = ()=> window.innerHeight;
 const clamp01 = v => Math.max(0, Math.min(1, v));
 const clampIndex = i => Math.max(0, Math.min(slideCount - 1, i));
 
-/* ---------------------- hero rendering (kept) ---------------------- */
-function setHeroVisible(visible){
-  if(visible){
-    hero.style.pointerEvents = 'auto';
-    hero.setAttribute('aria-hidden','false');
-    // slider remains interactive only when hero hidden
-  } else {
-    hero.style.pointerEvents = 'none';
-    hero.setAttribute('aria-hidden','true');
-  }
-}
-
+/* ---------- helper: render hero ---------- */
 function renderHero(p){
   progress = clamp01(p);
-
   const shift = initialGap + progress * (maxGap - initialGap);
   const depth = progress * 80;
   const tilt = -progress * 6;
@@ -236,7 +213,6 @@ function renderHero(p){
   rightShadow.style.opacity = String(Math.max(0, 0.9 - progress * 0.85));
   hint.style.opacity = String(Math.max(0, 1 - progress * 1.6));
 
-  // gap-light
   const lightStart = 0.12;
   const lightEnd = 0.9;
   if(progress <= lightStart){
@@ -249,7 +225,6 @@ function renderHero(p){
     gapLight.style.width = `${w}px`;
   }
 
-  // fade hero near end (opacity only)
   let fade = 1;
   if(progress >= FADE_START){
     const t = Math.min(1, (progress - FADE_START) / (FADE_END - FADE_START));
@@ -257,10 +232,11 @@ function renderHero(p){
   }
   hero.style.opacity = String(Math.max(0, fade));
 
-  // update heroVisible
-  setHeroVisible(progress < DISABLE_HERO_AT);
-
-  // vibrate once on crossing open threshold
+  // hero visibility for slider logic
+  const heroVisible = progress < DISABLE_HERO_AT;
+  hero.style.pointerEvents = heroVisible ? 'auto' : 'none';
+  hero.setAttribute('aria-hidden', heroVisible ? 'false' : 'true');
+  // vibrate once
   if(progress >= DISABLE_HERO_AT && !didVibrate){
     didVibrate = true;
     try { navigator.vibrate && navigator.vibrate(8); } catch(e){}
@@ -268,14 +244,14 @@ function renderHero(p){
   if(progress < DISABLE_HERO_AT && didVibrate) didVibrate = false;
 }
 
-/* batch rAF */
+/* rAF batching (hero) */
 function scheduleHeroRender(p){
   pendingProgress = clamp01(p);
   if(rafId) return;
   rafId = requestAnimationFrame(()=>{ rafId = 0; renderHero(pendingProgress); });
 }
 
-/* animate hero with overshoot */
+/* animate hero to target with overshoot */
 function animateHeroTo(target, duration=420){
   const from = progress;
   const start = performance.now();
@@ -284,39 +260,29 @@ function animateHeroTo(target, duration=420){
     const tRaw = Math.min(1, (now - start) / duration);
     const eased = 1 + c3 * Math.pow(tRaw - 1, 3) + c1 * Math.pow(tRaw - 1, 2);
     renderHero(from + (target - from) * eased);
-    if(tRaw < 1) requestAnimationFrame(step);
-    else renderHero(target);
+    if(tRaw < 1) requestAnimationFrame(step); else renderHero(target);
   }
   requestAnimationFrame(step);
 }
 
-/* ---------------------- SLIDER: translateY-based controller ---------------------- */
-
+/* ---------- slider controller (unchanged) ---------- */
 function setSlidesTransform(translateY, animate = false){
   if(animate) slidesWrap.style.transition = `transform ${SLIDE_ANIM_TIME}ms cubic-bezier(.22,.61,.36,1)`;
   else slidesWrap.style.transition = 'none';
   slidesWrap.style.transform = `translateY(${translateY}px)`;
 }
-
 function goToSlide(index, animate = true){
   index = clampIndex(index);
-  if(index === currentSlide && animate) {
-    // still snap to exact position
-    const to = -index * vh();
-    setSlidesTransform(to, true);
-    return;
-  }
   if(locked) return;
   locked = true;
   const to = -index * vh();
   setSlidesTransform(to, animate);
-  // ensure we unlock after animation time
   setTimeout(()=>{ locked = false; currentSlide = index; }, SLIDE_ANIM_TIME + 20);
 }
 
-/* pointer handlers for slider (drag to move slides) */
+/* slider pointer handlers (kept) */
 function onSliderPointerDown(e){
-  if(hero.style.pointerEvents !== 'none') return; // slider inactive while hero shown
+  if(hero.style.pointerEvents !== 'none') return;
   if(locked) return;
   slider.setPointerCapture && slider.setPointerCapture(e.pointerId);
   sliderDragging = true;
@@ -325,7 +291,6 @@ function onSliderPointerDown(e){
   sLastY = e.clientY;
   sLastTime = performance.now();
   sVelocity = 0;
-  // stop CSS transition if running
   slidesWrap.style.transition = 'none';
   e.preventDefault && e.preventDefault();
 }
@@ -348,14 +313,12 @@ function onSliderPointerUp(e){
   const dy = sStartY - e.clientY;
   const absDy = Math.abs(dy);
   const swipeThreshold = SLIDE_SWIPE_THRESHOLD_PX;
-  // projection
-  const projected = sStartTranslate - sVelocity * 180; // reversed sign due to earlier definitions
+  const projected = sStartTranslate - sVelocity * 180;
   const projectedIndex = Math.round(-projected / vh());
   let target = currentSlide;
   if(absDy > swipeThreshold){
     target = dy > 0 ? Math.min(currentSlide + 1, slideCount - 1) : Math.max(currentSlide - 1, 0);
   } else {
-    // use velocity/projection to nudge if appropriate, else nearest
     if(sVelocity > 0.2) target = Math.max(currentSlide - 1, 0);
     else if(sVelocity < -0.2) target = Math.min(currentSlide + 1, slideCount - 1);
     else target = clampIndex(Math.round(- (sStartTranslate) / vh()));
@@ -364,109 +327,63 @@ function onSliderPointerUp(e){
   e.preventDefault && e.preventDefault();
 }
 
-/* wheel handling (stepwise) */
-let wheelDebounce = null;
-function onSliderWheel(e){
-  if(hero.style.pointerEvents !== 'none') return;
-  e.preventDefault();
-  const dir = e.deltaY > 0 ? 1 : -1;
-  if(locked) return;
-  if(wheelDebounce) return;
-  wheelDebounce = setTimeout(()=> wheelDebounce = null, 120);
-  goToSlide(currentSlide + dir, true);
-}
-
-/* keyboard nav */
-function onKeyDown(e){
-  if(hero.style.pointerEvents !== 'none') return;
-  if(e.key === 'ArrowDown' || e.key === 'PageDown'){ e.preventDefault(); goToSlide(currentSlide + 1, true); }
-  if(e.key === 'ArrowUp'   || e.key === 'PageUp'){ e.preventDefault(); goToSlide(currentSlide - 1, true); }
-}
-
-/* responsive: recalc position */
-function onResize(){
-  setSlidesTransform(-currentSlide * vh(), false);
-}
-
-/* ---------------------- Wire events ---------------------- */
-/* slider pointer events */
+/* wire slider events */
 slidesWrap.addEventListener('pointerdown', onSliderPointerDown, { passive:false });
 window.addEventListener('pointermove', onSliderPointerMove, { passive:false });
 window.addEventListener('pointerup', onSliderPointerUp, { passive:false });
-slidesWrap.addEventListener('wheel', onSliderWheel, { passive:false }); // wheel inside slides
-window.addEventListener('keydown', onKeyDown);
-window.addEventListener('resize', onResize);
+slidesWrap.addEventListener('wheel', function(e){ if(hero.style.pointerEvents === 'none') { e.preventDefault(); goToSlide(currentSlide + (e.deltaY>0?1:-1), true); } }, { passive:false });
+window.addEventListener('keydown', function(e){ if(hero.style.pointerEvents === 'none'){ if(e.key==='ArrowDown'||e.key==='PageDown'){ e.preventDefault(); goToSlide(currentSlide+1,true);} if(e.key==='ArrowUp'||e.key==='PageUp'){ e.preventDefault(); goToSlide(currentSlide-1,true);} } });
 
-/* prevent default touchmove when slider active (extra safety) */
-slidesWrap.addEventListener('touchmove', function(e){ if(hero.style.pointerEvents === 'none') e.preventDefault(); }, { passive:false });
-
-/* ---------------------- hero pointer handlers (kept) ---------------------- */
-window.addEventListener('pointerdown', function(e){
-  // hero drag only when hero is interactive (pointerEvents != none)
-  if(e.target.closest('.hero') && hero.style.pointerEvents !== 'none'){
-    isDraggingHero = true;
-    setDraggingState(true);
-    startYHero = e.clientY; startProgress = progress;
-    lastMoveTime = performance.now(); lastMoveY = e.clientY; velocityHero = 0;
-    //e.preventDefault && e.preventDefault();
-    return;
-  }
-  // if click on slides area while hero open, ignore (hero should handle swipe)
+/* ---------- HERO pointer handlers (now on hero element) ---------- */
+hero.addEventListener('pointerdown', function(e){
+  // only when hero is interactive
+  if(hero.style.pointerEvents === 'none') return;
+  // start drag on hero; capture pointer to avoid other handlers interfering
+  hero.setPointerCapture && hero.setPointerCapture(e.pointerId);
+  isDraggingHero = true;
+  startYHero = e.clientY;
+  startProgress = progress;
+  lastMoveTime = performance.now();
+  lastMoveY = e.clientY;
+  velocityHero = 0;
+  hero.classList.add('dragging');
+  // prevent browser default scrolling — we handle movement manually now
+  e.preventDefault && e.preventDefault();
 }, { passive:false });
 
 window.addEventListener('pointermove', function(e){
-  if(isDraggingHero){
-    const now = performance.now();
-    const dy = startYHero - e.clientY;
-    const swipeDistance = window.innerHeight * SWIPE_DISTANCE_FACTOR;
-    const deltaProgress = dy / swipeDistance;
-    scheduleHeroRender(startProgress + deltaProgress);
-    const dt = Math.max(8, now - lastMoveTime);
-    const v = (lastMoveY - e.clientY) / dt;
-    velocityHero = velocityHero * 0.6 + v * 0.4;
-    lastMoveTime = now; lastMoveY = e.clientY;
-    e.preventDefault && e.preventDefault();
-    return;
-  }
+  if(!isDraggingHero) return;
+  const now = performance.now();
+  const dy = startYHero - e.clientY;
+  const swipeDistance = window.innerHeight * SWIPE_DISTANCE_FACTOR;
+  const deltaProgress = dy / swipeDistance;
+  scheduleHeroRender(startProgress + deltaProgress);
+  const dt = Math.max(8, now - lastMoveTime);
+  const v = (lastMoveY - e.clientY) / dt;
+  velocityHero = velocityHero * 0.6 + v * 0.4;
+  lastMoveTime = now; lastMoveY = e.clientY;
+  e.preventDefault && e.preventDefault();
 }, { passive:false });
 
-window.addEventListener('pointerup', function(){
-  if(isDraggingHero){
-    const projectionMs = 180;
-    const projected = clamp01(progress + velocityHero * projectionMs / (window.innerHeight * SWIPE_DISTANCE_FACTOR));
-    const target = (projected > 0.5) ? 1 : 0;
-    const dist = Math.abs(target - progress);
-    const dur = Math.min(700, Math.max(180, 280 + dist * 480));
-    animateHeroTo(target, dur);
-  }
+window.addEventListener('pointerup', function(e){
+  if(!isDraggingHero) return;
   isDraggingHero = false;
-  setDraggingState(false);
-}, { passive:true });
-
-/* wheel for hero when hero visible */
-let heroWheelTimer = null;
-window.addEventListener('wheel', function(e){
-  if(hero.style.pointerEvents === 'none') return;
-  e.preventDefault();
-  const sensitivity = 0.003;
-  scheduleHeroRender(progress + e.deltaY * sensitivity);
-  if(heroWheelTimer) clearTimeout(heroWheelTimer);
-  heroWheelTimer = setTimeout(()=>{
-    heroWheelTimer = null;
-    const target = (progress > 0.5) ? 1 : 0;
-    animateHeroTo(target, 360);
-  }, 110);
+  hero.classList.remove('dragging');
+  hero.releasePointerCapture && hero.releasePointerCapture(e.pointerId);
+  const projectionMs = 180;
+  const projected = clamp01(progress + velocityHero * projectionMs / (window.innerHeight * SWIPE_DISTANCE_FACTOR));
+  const target = (projected > 0.5) ? 1 : 0;
+  const dist = Math.abs(target - progress);
+  const dur = Math.min(700, Math.max(180, 280 + dist * 480));
+  animateHeroTo(target, dur);
+  e.preventDefault && e.preventDefault();
 }, { passive:false });
 
-/* init positions */
+/* ---------- init ---------- */
 setSlidesTransform(0, false);
 renderHero(0);
-setHeroVisible(true);
-
-/* on load, ensure slider hidden/locked until hero closed */
-currentSlide = 0;
-
 })();
 </script>
+
 </body>
-</html>
+  </html>
