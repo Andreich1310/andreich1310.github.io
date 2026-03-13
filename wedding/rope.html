@@ -2,23 +2,22 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"/>
+<title>Rope</title>
 
 <style>
 html,body{
-margin:0;
-padding:0;
-height:100%;
-overflow:hidden;
-background:#f3e6d3;
-touch-action:none;
-overscroll-behavior:none;
+  height:100%;
+  margin:0;
+  overflow:hidden;
+  background:#f3e6d3;
+  touch-action:none;
 }
 
 canvas{
-display:block;
-width:100vw;
-height:100vh;
+  display:block;
+  width:100vw;
+  height:100vh;
 }
 </style>
 </head>
@@ -27,197 +26,186 @@ height:100vh;
 <canvas id="c"></canvas>
 
 <script>
-const canvas = document.getElementById('c')
-const ctx = canvas.getContext('2d')
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
 
 function resize(){
-canvas.width = innerWidth
-canvas.height = innerHeight
+  canvas.width = innerWidth;
+  canvas.height = innerHeight;
 }
-addEventListener('resize',resize)
-resize()
+resize();
+addEventListener('resize', resize);
 
-/* ---------- rope parameters ---------- */
+/* -------- rope setup -------- */
 
-const ropeLength = 360
-const segments = 5
-const spacing = ropeLength/(segments-1)
+const segments = 5;
+const totalLength = 360;      // прежняя длина верёвки
+const spacing = totalLength / segments;
 
-const ropeWidth = 30
-
-let anchorX
-let anchorY = 120
-
-/* ---------- physics ---------- */
+let points = [];
+let sticks = [];
 
 class Point{
-constructor(x,y,pinned=false){
-this.x=x
-this.y=y
-this.oldx=x
-this.oldy=y
-this.pinned=pinned
-}
+  constructor(x,y,pinned=false){
+    this.x=x; this.y=y;
+    this.oldx=x; this.oldy=y;
+    this.pinned=pinned;
+  }
 }
 
 class Stick{
-constructor(a,b){
-this.a=a
-this.b=b
-this.length=Math.hypot(a.x-b.x,a.y-b.y)
-}
-}
-
-let points=[]
-let sticks=[]
-
-function build(){
-anchorX = canvas.width/2
-points=[]
-sticks=[]
-
-for(let i=0;i<segments;i++){
-const p=new Point(anchorX,anchorY+i*spacing,i===0)
-points.push(p)
-if(i>0) sticks.push(new Stick(points[i-1],p))
-}
-}
-build()
-
-/* ---------- accelerometer sway ---------- */
-
-let sway=0
-let targetSway=0
-
-function motion(e){
-const ax=e.accelerationIncludingGravity?.x||0
-targetSway=ax*0.02
+  constructor(a,b){
+    this.p0=a;
+    this.p1=b;
+    this.length=Math.hypot(a.x-b.x,a.y-b.y);
+  }
 }
 
-window.addEventListener("devicemotion",motion)
+let anchorX = innerWidth/2;
+let anchorY = 120;
 
-/* ---------- drag ---------- */
+function buildRope(){
+  points=[];
+  sticks=[];
+  
+  for(let i=0;i<=segments;i++){
+    const p = new Point(anchorX, anchorY + i*spacing, i===0);
+    points.push(p);
+    
+    if(i>0) sticks.push(new Stick(points[i-1],p));
+  }
+}
 
-let drag=false
+buildRope();
+
+/* -------- physics -------- */
+
+const gravity = 0.7;
+let sway = 0;
+let targetSway = 0;
+
+function handleMotion(e){
+  const ax = e.accelerationIncludingGravity?.x || 0;
+  targetSway = -ax * 0.03;
+}
+
+window.addEventListener("devicemotion",handleMotion);
+
+function physics(){
+
+  sway += (targetSway - sway) * 0.12;
+
+  for(let i=0;i<points.length;i++){
+
+    const p = points[i];
+    if(p.pinned) continue;
+
+    let vx = (p.x - p.oldx) * 0.995;
+    let vy = (p.y - p.oldy) * 0.995;
+
+    p.oldx = p.x;
+    p.oldy = p.y;
+
+    p.x += vx;
+    p.y += vy + gravity;
+
+    const weight = i/(points.length-1);
+    p.x += sway * (0.5 + weight*0.1);
+  }
+
+  for(let k=0;k<12;k++){
+    for(const s of sticks){
+
+      let dx = s.p1.x - s.p0.x;
+      let dy = s.p1.y - s.p0.y;
+
+      let dist = Math.hypot(dx,dy);
+      let diff = (dist - s.length)/dist;
+
+      let offx = dx*0.5*diff;
+      let offy = dy*0.5*diff;
+
+      if(!s.p0.pinned){
+        s.p0.x += offx;
+        s.p0.y += offy;
+      }else{
+        s.p0.x = anchorX;
+        s.p0.y = anchorY;
+      }
+
+      if(!s.p1.pinned){
+        s.p1.x -= offx;
+        s.p1.y -= offy;
+      }
+    }
+  }
+}
+
+/* -------- drag end -------- */
+
+let drag=false;
+const THRESH=70;
 
 canvas.addEventListener("pointerdown",e=>{
-const end=points[points.length-1]
-const d=Math.hypot(e.clientX-end.x,e.clientY-end.y)
+  const end = points[points.length-1];
+  const d = Math.hypot(end.x-e.clientX,end.y-e.clientY);
 
-if(d<80){
-drag=true
-end.x=e.clientX
-end.y=e.clientY
-end.oldx=end.x
-end.oldy=end.y
-}
-})
+  if(d<THRESH){
+    drag=true;
+    end.x=e.clientX;
+    end.y=e.clientY;
+    end.oldx=end.x;
+    end.oldy=end.y;
+  }
+});
 
 canvas.addEventListener("pointermove",e=>{
-if(!drag)return
-const end=points[points.length-1]
+  if(!drag) return;
 
-end.x=e.clientX
-end.y=e.clientY
-})
+  const end = points[points.length-1];
+  end.x=e.clientX;
+  end.y=e.clientY;
+});
 
-canvas.addEventListener("pointerup",()=>drag=false)
-canvas.addEventListener("pointercancel",()=>drag=false)
+canvas.addEventListener("pointerup",()=>drag=false);
+canvas.addEventListener("pointercancel",()=>drag=false);
 
-/* ---------- physics ---------- */
-
-const gravity=0.6
-const damping=0.995
-const constraintPasses=20
-
-function update(){
-
-sway+=(targetSway-sway)*0.15
-
-for(let i=0;i<points.length;i++){
-const p=points[i]
-if(p.pinned) continue
-
-let vx=(p.x-p.oldx)*damping
-let vy=(p.y-p.oldy)*damping
-
-p.oldx=p.x
-p.oldy=p.y
-
-p.x+=vx
-p.y+=vy+gravity
-
-const weight=i/(points.length-1)
-p.x+=sway*weight*10
-}
-
-/* sticks */
-
-for(let k=0;k<constraintPasses;k++){
-
-for(const s of sticks){
-
-const dx=s.b.x-s.a.x
-const dy=s.b.y-s.a.y
-
-const dist=Math.hypot(dx,dy)
-const diff=(dist-s.length)/dist
-
-const offx=dx*0.5*diff
-const offy=dy*0.5*diff
-
-if(!s.a.pinned){
-s.a.x+=offx
-s.a.y+=offy
-}
-
-if(!s.b.pinned || drag){
-s.b.x-=offx
-s.b.y-=offy
-}
-}
-
-points[0].x=anchorX
-points[0].y=anchorY
-}
-
-}
-
-/* ---------- draw ---------- */
+/* -------- draw -------- */
 
 function draw(){
 
-ctx.fillStyle="#f3e6d3"
-ctx.fillRect(0,0,canvas.width,canvas.height)
+  ctx.fillStyle="#f3e6d3";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
 
-ctx.lineWidth=ropeWidth
-ctx.lineCap="round"
-ctx.lineJoin="round"
-ctx.strokeStyle="#c62828"
+  ctx.lineWidth=25;
+  ctx.lineCap="round";
+  ctx.lineJoin="round";
+  ctx.strokeStyle="#c62828";
 
-ctx.beginPath()
+  ctx.beginPath();
+  ctx.moveTo(points[0].x,points[0].y);
 
-ctx.moveTo(points[0].x,points[0].y)
+  for(let i=1;i<points.length-1;i++){
+    const cx=(points[i].x+points[i+1].x)/2;
+    const cy=(points[i].y+points[i+1].y)/2;
+    ctx.quadraticCurveTo(points[i].x,points[i].y,cx,cy);
+  }
 
-for(let i=1;i<points.length;i++){
-ctx.lineTo(points[i].x,points[i].y)
+  const last=points[points.length-1];
+  ctx.lineTo(last.x,last.y);
+
+  ctx.stroke();
 }
 
-ctx.stroke()
-
-}
-
-/* ---------- loop ---------- */
+/* -------- loop -------- */
 
 function loop(){
-
-update()
-draw()
-
-requestAnimationFrame(loop)
+  physics();
+  draw();
+  requestAnimationFrame(loop);
 }
 
-loop()
+loop();
 
 </script>
 </body>
