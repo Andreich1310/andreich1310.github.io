@@ -440,6 +440,21 @@ async function loadSVGSlides(){
 
 loadSVGSlides();
 
+const params = new URLSearchParams(window.location.search);
+const guestText = params.get("guest");
+
+if (guestText) {
+
+  const tspans = document.querySelectorAll(".svg-slide tspan");
+
+  tspans.forEach(el => {
+    if (el.textContent.trim() === "Дорогие и") {
+      el.textContent = guestText;
+    }
+  });
+
+}
+  
   
 </script>
 
