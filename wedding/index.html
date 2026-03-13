@@ -444,7 +444,7 @@ const params = new URLSearchParams(window.location.search);
 const guestText = params.get("guest");
 
 if (guestText) {
-
+  alert(guestText);
   const tspans = document.querySelectorAll(".svg-slide tspan");
 
   tspans.forEach(el => {
