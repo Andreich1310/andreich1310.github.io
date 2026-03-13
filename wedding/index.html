@@ -39,7 +39,6 @@ html,body{
   perspective:1000px;
   z-index:100;
   transition:opacity .35s cubic-bezier(.22,.61,.36,1);
-  /* IMPORTANT: handle hero gestures in JS to ensure perfect follow — set to none */
   touch-action:none;
 }
 
@@ -61,9 +60,10 @@ html,body{
 .panel img{ width:100%; height:100%; object-fit:cover; display:block; position:relative; z-index:60; will-change:transform; transition:transform .35s cubic-bezier(.22,.61,.36,1); }
 .left .panel img{ object-position:left center; } .right .panel img{ object-position:right center; }
 
-.door-shadow{ position:absolute; top:0; bottom:0; width:10vw; filter:blur(18px); opacity:.9; pointer-events:none; transform-style:preserve-3d; transition: opacity .22s linear, transform .22s linear; transform: translateZ(-80px); z-index:40; }
-.door-shadow.left{ right:-6vw; background:linear-gradient(to right,rgba(0,0,0,.72), rgba(0,0,0,.32), transparent); }
-.door-shadow.right{ left:-6vw; background:linear-gradient(to left,rgba(0,0,0,.72), rgba(0,0,0,.32), transparent); }
+/* тень под створкой — теперь видна (z-index и позиционирование) */
+.door-shadow{ position:absolute; top:0; bottom:0; width:10vw; filter:blur(18px); opacity:.9; pointer-events:none; transform-style:preserve-3d; transition: opacity .22s linear, transform .22s linear; transform: translateZ(-80px); z-index:1; }
+.door-shadow.left{ right:6vw; background:linear-gradient(to right,rgba(0,0,0,.72), rgba(0,0,0,.32), transparent); }
+.door-shadow.right{ left:6vw; background:linear-gradient(to left,rgba(0,0,0,.72), rgba(0,0,0,.32), transparent); }
 
 .inner-edge{ position:absolute; top:0; bottom:0; width:16px; z-index:90; pointer-events:none; mix-blend-mode:multiply; }
 .left .inner-edge{ right:0; background:linear-gradient(to left, rgba(0,0,0,.46), rgba(0,0,0,.06) 36%, transparent 100%); }
@@ -77,49 +77,70 @@ html,body{
 .gap-light{ position:absolute; left:50%; top:0; bottom:0; width:6px; transform:translateX(-50%); pointer-events:none; z-index:20; background: linear-gradient(180deg, rgba(255,245,220,0.95), rgba(255,230,160,0.6)); filter: blur(18px); opacity:0; transition: opacity .26s linear, width .26s linear; }
 
 /* SLIDER: JS-controlled */
-/* slider: use dynamic viewport height (dvh) with vh fallback */
 .slider{
   position:relative;
-  height:100vh;    /* fallback */
-  height:100dvh;   /* prefer dynamic viewport height */
+  height:100vh;
+  height:100dvh;
   overflow:hidden;
   touch-action:none;
   -webkit-user-select:none;
   user-select:none;
 }
-
-/* slides container — НЕ делаем жесткую 100% высоту, пусть будет auto.
-   Это важно: каждая .slide сама задаёт свою высоту (100dvh). */
 .slides{
-  height:auto;     /* <<--- changed */
+  height:auto;
   width:100%;
   transition: transform 420ms cubic-bezier(.22,.61,.36,1);
   will-change: transform;
 }
-
-/* each slide fills the dynamic viewport */
 .slide{
-  height:100vh;    /* fallback for older browsers */
-  height:100dvh;   /* preferred — real visible screen height on mobile */
+  position:relative;
+  height:100vh;
+  height:100dvh;
   width:100%;
   box-sizing:border-box;
 }
+.slide img{ width:100%; height:100%; object-fit:cover; display:block; }
+.slide svg { width: 100%; height: 100%; display: block; }
 
-/* image covers the slide */
-.slide img{
-  width:100%;
-  height:100%;
-  object-fit:cover;
-  display:block;
-}
-.slide svg {
-  width: 100%;
-  height: 100%;
-  display: block;       /* чтобы убрать лишние пробелы */
-}
-  
 @media (max-width:520px){
-  .door-shadow{ width:14vw; filter:blur(12px); } .inner-edge{ width:12px; } .door-shadow.left{ right:-10vw; } .door-shadow.right{ left:-10vw; } .gap-light{ width:10px; }
+  .door-shadow{ width:14vw; filter:blur(12px); }
+  .inner-edge{ width:12px; }
+  .door-shadow.left{ right:-10vw; }
+  .door-shadow.right{ left:-10vw; }
+  .gap-light{ width:10px; }
+}
+
+/* --- slide hint --- */
+.slide-hint{
+  position:absolute;
+  left:50%;
+  bottom:10vh;
+  transform:translateX(-50%);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:6px;
+  z-index:200;
+  pointer-events:none;
+  opacity:0;
+  transition:opacity .35s;
+}
+.slide-hint svg{ width:28px; height:28px; animation:slideHintMove 1.4s infinite ease-in-out; }
+@keyframes slideHintMove{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-10px); } }
+.slide-hint-text{ background:rgba(255,255,255,.9); padding:6px 12px; border-radius:999px; font-size:13px; box-shadow:0 6px 18px rgba(0,0,0,.08); }
+
+/* --- end message --- */
+.end-message{
+  position:absolute;
+  left:50%;
+  bottom:6vh;
+  transform:translateX(-50%) scale(1);
+  font-size:32px;
+  color:#2b2b2b;
+  font-family:"SegoeScript";
+  pointer-events:none;
+  z-index:300;
+  transition:transform .25s cubic-bezier(.22,.61,.36,1);
 }
 </style>
 </head>
@@ -153,9 +174,8 @@ html,body{
   </div>
 </div>
 
-<div class="slider" id="slider" aria-hidden="true">          
+<div class="slider" id="slider" aria-hidden="true">
   <div class="slides" id="slides">
-
 
     <section class="slide">
         <div class="svg-slide" data-src="slides/v0.47 + текст_1.svg"></div>
@@ -183,9 +203,20 @@ html,body{
     
     <section class="slide">
         <div class="svg-slide" data-src="slides/7.svg"></div>
+        <div class="end-message" id="endMessage">До встречи</div>
     </section>
     
   </div>
+
+  <!-- подсказка свайпа (появляется после открытия обложки, скрывается после первого свайпа) -->
+  <div class="slide-hint" id="slideHint" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="6 15 12 9 18 15"></polyline>
+    </svg>
+    <div class="slide-hint-text">Листай вверх</div>
+  </div>
+
 </div>
 
 <script>
@@ -208,6 +239,9 @@ const slidesWrap = document.getElementById('slides');
 const slides = Array.from(slidesWrap.querySelectorAll('.slide'));
 const slideCount = slides.length;
 
+const slideHint = document.getElementById('slideHint');
+const endMessage = document.getElementById('endMessage');
+
 /* ---------- settings ---------- */
 const SWIPE_DISTANCE_FACTOR = 0.12;
 const SLIDE_SWIPE_THRESHOLD_PX = 60;
@@ -226,7 +260,7 @@ let progress = 0;
 let rafId = 0, pendingProgress = 0;
 let didVibrate = false;
 
-/* hero drag state (now handled on hero element) */
+/* hero drag state */
 let isDraggingHero = false;
 let startYHero = 0;
 let startProgress = 0;
@@ -234,7 +268,7 @@ let lastMoveTime = 0;
 let lastMoveY = 0;
 let velocityHero = 0;
 
-/* slider state kept same as before */
+/* slider state */
 let currentSlide = 0;
 let locked = false;
 let sliderDragging = false;
@@ -289,10 +323,12 @@ function renderHero(p){
   const heroVisible = progress < DISABLE_HERO_AT;
   hero.style.pointerEvents = heroVisible ? 'auto' : 'none';
   hero.setAttribute('aria-hidden', heroVisible ? 'false' : 'true');
-  // vibrate once
+
+  // vibration & show slide hint once on open
   if(progress >= DISABLE_HERO_AT && !didVibrate){
     didVibrate = true;
     try { navigator.vibrate && navigator.vibrate(8); } catch(e){}
+    if(slideHint) slideHint.style.opacity = '1';
   }
   if(progress < DISABLE_HERO_AT && didVibrate) didVibrate = false;
 }
@@ -318,7 +354,7 @@ function animateHeroTo(target, duration=420){
   requestAnimationFrame(step);
 }
 
-/* ---------- slider controller (unchanged) ---------- */
+/* ---------- slider controller ---------- */
 function setSlidesTransform(translateY, animate = false){
   if(animate) slidesWrap.style.transition = `transform ${SLIDE_ANIM_TIME}ms cubic-bezier(.22,.61,.36,1)`;
   else slidesWrap.style.transition = 'none';
@@ -327,14 +363,19 @@ function setSlidesTransform(translateY, animate = false){
 function goToSlide(index, animate = true){
   index = clampIndex(index);
   if(locked) return;
+  // hide slide hint on navigation
+  if(slideHint) slideHint.style.opacity = '0';
   locked = true;
   const to = -index * vh();
   setSlidesTransform(to, animate);
   setTimeout(()=>{ locked = false; currentSlide = index; }, SLIDE_ANIM_TIME + 20);
 }
 
-/* slider pointer handlers (kept) */
+/* slider pointer handlers */
 function onSliderPointerDown(e){
+  // hide slide hint on first interaction
+  if(slideHint) slideHint.style.opacity = '0';
+
   if(hero.style.pointerEvents !== 'none') return;
   if(locked) return;
   slider.setPointerCapture && slider.setPointerCapture(e.pointerId);
@@ -357,6 +398,13 @@ function onSliderPointerMove(e){
   const v = (sLastY - e.clientY) / dt;
   sVelocity = sVelocity * 0.6 + v * 0.4;
   sLastTime = now; sLastY = e.clientY;
+  // overscroll effect for end message on last slide
+  if(currentSlide === slideCount - 1 && endMessage){
+    // when dragging up beyond last slide, dy becomes negative -> overscroll positive
+    const overscroll = Math.max(0, - (e.clientY - sStartY));
+    const scale = 1 + Math.min(overscroll / 300, 0.8);
+    endMessage.style.transform = `translateX(-50%) scale(${scale})`;
+  }
   e.preventDefault && e.preventDefault();
 }
 function onSliderPointerUp(e){
@@ -377,6 +425,8 @@ function onSliderPointerUp(e){
     else target = clampIndex(Math.round(- (sStartTranslate) / vh()));
   }
   goToSlide(target, true);
+  // reset end message size
+  if(endMessage) endMessage.style.transform = "translateX(-50%) scale(1)";
   e.preventDefault && e.preventDefault();
 }
 
@@ -387,11 +437,9 @@ window.addEventListener('pointerup', onSliderPointerUp, { passive:false });
 slidesWrap.addEventListener('wheel', function(e){ if(hero.style.pointerEvents === 'none') { e.preventDefault(); goToSlide(currentSlide + (e.deltaY>0?1:-1), true); } }, { passive:false });
 window.addEventListener('keydown', function(e){ if(hero.style.pointerEvents === 'none'){ if(e.key==='ArrowDown'||e.key==='PageDown'){ e.preventDefault(); goToSlide(currentSlide+1,true);} if(e.key==='ArrowUp'||e.key==='PageUp'){ e.preventDefault(); goToSlide(currentSlide-1,true);} } });
 
-/* ---------- HERO pointer handlers (now on hero element) ---------- */
+/* ---------- HERO pointer handlers ---------- */
 hero.addEventListener('pointerdown', function(e){
-  // only when hero is interactive
   if(hero.style.pointerEvents === 'none') return;
-  // start drag on hero; capture pointer to avoid other handlers interfering
   hero.setPointerCapture && hero.setPointerCapture(e.pointerId);
   isDraggingHero = true;
   startYHero = e.clientY;
@@ -400,7 +448,6 @@ hero.addEventListener('pointerdown', function(e){
   lastMoveY = e.clientY;
   velocityHero = 0;
   hero.classList.add('dragging');
-  // prevent browser default scrolling — we handle movement manually now
   e.preventDefault && e.preventDefault();
 }, { passive:false });
 
@@ -437,36 +484,29 @@ setSlidesTransform(0, false);
 renderHero(0);
 })();
 
+/* ---------- lazy-load SVG slides and personalize --------- */
 async function loadSVGSlides(){
-
   const containers = document.querySelectorAll(".svg-slide");
-
   for(const el of containers){
-
     const url = el.dataset.src;
-
-    const res = await fetch(url);
-    const svgText = await res.text();
-
-    el.innerHTML = svgText;
-
+    try {
+      const res = await fetch(url);
+      const svgText = await res.text();
+      el.innerHTML = svgText;
+    } catch(err){
+      // ignore load error, leave placeholder
+      console.warn("SVG load failed for", url, err);
+    }
   }
-
-  // 👇 теперь SVG точно в DOM
   replaceGuestText();
-
 }
 
 function replaceGuestText(){
-
   const params = new URLSearchParams(window.location.search);
   const guestText = params.get("guest");
   const guestText2 = params.get("guest2");
-  
   if (!guestText) return;
-
   const tspans = document.querySelectorAll(".svg-slide tspan");
-
   tspans.forEach(el => {
     if (el.textContent.trim() === "Дорогие и") {
       el.textContent = guestText;
@@ -474,15 +514,12 @@ function replaceGuestText(){
     if (el.textContent.trim() === "любимые Гости!") {
       el.textContent = guestText2;
     }
-    
   });
-
 }
 
 loadSVGSlides();
-  
-  
+
 </script>
 
 </body>
-  </html>
+</html>
