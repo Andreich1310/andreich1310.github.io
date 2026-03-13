@@ -1,253 +1,261 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Rope accelerometer demo</title>
-
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Rope — steady down, accel sway</title>
 <style>
-body{
-  margin:0;
-  background:#111;
-  overflow:hidden;
-  font-family:sans-serif;
-}
-
-canvas{
-  display:block;
-}
-
-button{
-  position:fixed;
-  top:20px;
-  left:20px;
-  padding:10px 16px;
-  border:none;
-  border-radius:8px;
-  background:#fff;
-  cursor:pointer;
-}
+  :root{ --bg:#0e0e10; --card:#fff; --muted:#bdbdbd; }
+  html,body{height:100%;margin:0;background:var(--bg);color:#fff;font-family:Inter,system-ui,Arial;}
+  canvas{display:block;width:100%;height:100vh}
+  #controls{
+    position:fixed;left:16px;top:16px;z-index:10;
+    display:flex;gap:8px;align-items:center;
+  }
+  button{
+    background:var(--card);color:#111;border:0;padding:8px 12px;border-radius:10px;cursor:pointer;
+    box-shadow:0 6px 18px rgba(0,0,0,.35);
+  }
+  .hint{color:var(--muted);font-size:13px;margin-left:8px}
 </style>
 </head>
 <body>
 
-<button id="enable">Включить акселерометр</button>
+<div id="controls">
+  <button id="enable">Включить акселерометр</button>
+  <button id="reset">Сброс позиции</button>
+  <div class="hint">Гравитация всегда вниз; акселерометр — только боковое качание</div>
+</div>
+
 <canvas id="c"></canvas>
 
 <script>
-
-const canvas = document.getElementById("c")
-const ctx = canvas.getContext("2d")
+/* canvas */
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d', { alpha: false });
 
 function resize(){
-  canvas.width = innerWidth
-  canvas.height = innerHeight
+  canvas.width = innerWidth;
+  canvas.height = innerHeight;
 }
-resize()
-addEventListener("resize",resize)
+addEventListener('resize', resize);
+resize();
 
-
-/* -------------------------------
-   Rope physics (Verlet)
---------------------------------*/
-
-class Point{
+/* Verlet points & sticks */
+class Point {
   constructor(x,y,pinned=false){
-    this.x=x
-    this.y=y
-    this.oldx=x
-    this.oldy=y
-    this.pinned=pinned
+    this.x=x; this.y=y;
+    this.oldx=x; this.oldy=y;
+    this.pinned = pinned;
   }
 }
-
-class Stick{
-  constructor(p0,p1){
-    this.p0=p0
-    this.p1=p1
-    this.length=Math.hypot(p1.x-p0.x,p1.y-p0.y)
-  }
+class Stick {
+  constructor(a,b){ this.p0=a; this.p1=b; this.length = Math.hypot(a.x-b.x,a.y-b.y); }
 }
 
-const points=[]
-const sticks=[]
+/* rope params */
+let segments = 28;
+let spacing = 22;
+let points = [];
+let sticks = [];
+let anchorX = canvas.width/2;
+let anchorY = 110;
 
-const segments=20
-const spacing=20
-
-for(let i=0;i<segments;i++){
-
-  const p=new Point(
-    canvas.width/2,
-    100+i*spacing,
-    i===0
-  )
-
-  points.push(p)
-
-  if(i>0){
-    sticks.push(new Stick(points[i-1],p))
+function buildRope(){
+  points = []; sticks = [];
+  for(let i=0;i<segments;i++){
+    const p = new Point(anchorX, anchorY + i*spacing, i===0); // top pinned
+    points.push(p);
+    if(i>0) sticks.push(new Stick(points[i-1], points[i]));
   }
-
 }
+buildRope();
 
+/* physics params */
+const gravityY = 0.7;     // постоянная вертикальная тяга вниз
+let swayX = 0;            // текущая боковая добавка от акселерометра
+let targetSwayX = 0;      // сглаживаем к цели
+const swayScale = 0.05;   // масштаб эффекта акселерометра (подбери под устройство)
+const velocityDamping = 0.995; // затухание скорости (чтобы верёвка не разгонялась бесконечно)
 
-/* -------------------------------
-   accelerometer gravity
---------------------------------*/
-
-let gravityX=0
-let gravityY=0.5
-
+/* accelerometer: устанавливает targetSwayX (только боковое) */
 function handleMotion(e){
-
-  const ax=e.accelerationIncludingGravity.x
-  const ay=e.accelerationIncludingGravity.y
-
-  gravityX=ax*0.05
-  gravityY=-ay*0.05
+  // на разных устройствах оси могут быть разными — используем accelerationIncludingGravity.x как горизонтальный наклон
+  const ax = e.accelerationIncludingGravity && e.accelerationIncludingGravity.x ? e.accelerationIncludingGravity.x : 0;
+  // переворачиваем знак/масштаб под удобное поведение
+  targetSwayX = ax * swayScale;
 }
-
-document.getElementById("enable").onclick=()=>{
-
-  if(typeof DeviceMotionEvent.requestPermission==="function"){
-
-    DeviceMotionEvent.requestPermission()
-      .then(res=>{
-        if(res==="granted"){
-          window.addEventListener("devicemotion",handleMotion)
-        }
-      })
-
-  }else{
-    window.addEventListener("devicemotion",handleMotion)
+document.getElementById('enable').onclick = ()=>{
+  if(typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function'){
+    DeviceMotionEvent.requestPermission().then(r=>{
+      if(r === 'granted'){ window.addEventListener('devicemotion', handleMotion); }
+    }).catch(()=>{/*Denied or not available*/});
+  } else {
+    window.addEventListener('devicemotion', handleMotion);
   }
+};
 
-}
+/* optionally reset rope */
+document.getElementById('reset').onclick = ()=>{
+  anchorX = canvas.width/2;
+  buildRope();
+};
 
-
-/* -------------------------------
-   mouse interaction
---------------------------------*/
-
-let drag=null
-
-canvas.onpointerdown=e=>{
-
-  let min=30
-
-  for(let p of points){
-
-    const d=Math.hypot(p.x-e.clientX,p.y-e.clientY)
-
-    if(d<min){
-      drag=p
-      break
+/* mouse / touch drag */
+let drag = null;
+canvas.addEventListener('pointerdown', e=>{
+  const x = e.clientX, y = e.clientY;
+  let min = 28;
+  for(let i=0;i<points.length;i++){
+    const p = points[i];
+    const d = Math.hypot(p.x-x,p.y-y);
+    if(d < min){
+      drag = p; break;
     }
+  }
+});
+canvas.addEventListener('pointermove', e=>{
+  if(drag){ drag.x = e.clientX; drag.y = e.clientY; }
+});
+canvas.addEventListener('pointerup', ()=>drag=null);
+canvas.addEventListener('pointercancel', ()=>drag=null);
 
+/* physics update */
+function updatePhysics(){
+  // smooth sway towards target (low-pass) to avoid jitter
+  swayX += (targetSwayX - swayX) * 0.12;
+
+  // integrate (Verlet) — apply vertical gravity always, and lateral sway as small horizontal acceleration
+  for(let i=0;i<points.length;i++){
+    const p = points[i];
+    if(p.pinned) continue;
+
+    let vx = (p.x - p.oldx) * velocityDamping;
+    let vy = (p.y - p.oldy) * velocityDamping;
+
+    p.oldx = p.x;
+    p.oldy = p.y;
+
+    // vertical gravity always downward (positive)
+    p.x += vx;
+    p.y += vy + gravityY;
+
+    // apply lateral sway as a small horizontal acceleration.
+    // stronger effect nearer к низу (bottom moves more) — weightFactor from 0 (top) to 1 (bottom)
+    const weightFactor = i / (points.length - 1);
+    p.x += swayX * (0.9 + 0.1 * weightFactor); // slight weighting
   }
 
-}
-
-canvas.onpointermove=e=>{
-  if(drag){
-    drag.x=e.clientX
-    drag.y=e.clientY
-  }
-}
-
-canvas.onpointerup=()=>drag=null
-
-
-/* -------------------------------
-   physics update
---------------------------------*/
-
-function update(){
-
-  for(let p of points){
-
-    if(p.pinned) continue
-
-    let vx=p.x-p.oldx
-    let vy=p.y-p.oldy
-
-    p.oldx=p.x
-    p.oldy=p.y
-
-    p.x+=vx+gravityX
-    p.y+=vy+gravityY
-
-  }
-
-  for(let i=0;i<5;i++){
-
+  // constraints: satisfy sticks multiple times for stiffness
+  for(let iter=0; iter<6; iter++){
     for(let s of sticks){
+      const dx = s.p1.x - s.p0.x;
+      const dy = s.p1.y - s.p0.y;
+      let dist = Math.hypot(dx, dy);
+      if(dist === 0) continue;
+      let diff = (dist - s.length) / dist;
+      const offx = dx * 0.5 * diff;
+      const offy = dy * 0.5 * diff;
 
-      let dx=s.p1.x-s.p0.x
-      let dy=s.p1.y-s.p0.y
-
-      let dist=Math.hypot(dx,dy)
-      let diff=(dist-s.length)/dist
-
-      let offx=dx*0.5*diff
-      let offy=dy*0.5*diff
-
-      if(!s.p0.pinned){
-        s.p0.x+=offx
-        s.p0.y+=offy
+      if(!s.p0.pinned){ s.p0.x += offx; s.p0.y += offy; }
+      else { // pinned: keep pinned point fixed to anchor (allow small correction to maintain anchor)
+        s.p0.x = anchorX; s.p0.y = anchorY;
       }
-
-      if(!s.p1.pinned){
-        s.p1.x-=offx
-        s.p1.y-=offy
-      }
-
+      if(!s.p1.pinned){ s.p1.x -= offx; s.p1.y -= offy; }
     }
 
+    // re-enforce top anchor exactly
+    points[0].x = anchorX;
+    points[0].y = anchorY;
   }
-
 }
 
-
-/* -------------------------------
-   draw
---------------------------------*/
-
+/* draw */
 function draw(){
+  ctx.fillStyle = '#0e0e10';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
 
-  ctx.clearRect(0,0,canvas.width,canvas.height)
+  // background subtle
+  ctx.globalAlpha = 0.12;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0,0,canvas.width,60);
+  ctx.globalAlpha = 1;
 
-  ctx.lineWidth=3
-  ctx.strokeStyle="white"
+  // draw rope as smooth curve for nicer look
+  ctx.strokeStyle = '#f6f0e6';
+  ctx.lineWidth = 6;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
 
-  ctx.beginPath()
-
-  for(let s of sticks){
-
-    ctx.moveTo(s.p0.x,s.p0.y)
-    ctx.lineTo(s.p1.x,s.p1.y)
-
+  // Use quadratic curve through points for softness
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for(let i=1;i<points.length-1;i++){
+    const cx = (points[i].x + points[i+1].x)/2;
+    const cy = (points[i].y + points[i+1].y)/2;
+    ctx.quadraticCurveTo(points[i].x, points[i].y, cx, cy);
   }
+  // last segment straight to end
+  const last = points[points.length-1];
+  ctx.lineTo(last.x, last.y);
+  ctx.stroke();
 
-  ctx.stroke()
+  // draw a hanging card at the end (simple rounded rect)
+  const cardW = 220, cardH = 120;
+  const end = points[points.length-1];
+  const cardX = end.x - cardW/2;
+  const cardY = end.y + 14;
 
+  // small rotation based on last two points (for natural tilt)
+  const pPrev = points[points.length-2];
+  const angle = Math.atan2(end.y - pPrev.y, end.x - pPrev.x);
+
+  ctx.save();
+  ctx.translate(end.x, end.y + 14);
+  ctx.rotate(angle*0.5); // halve angle for subtlety
+  // rope connection point
+  ctx.fillStyle = '#f6f0e6';
+  ctx.beginPath();
+  ctx.arc(0, -14, 6, 0, Math.PI*2);
+  ctx.fill();
+
+  // card
+  ctx.fillStyle = '#fff';
+  roundRect(ctx, -cardW/2, 0, cardW, cardH, 14, true, false);
+  ctx.fillStyle = '#111';
+  ctx.font = '600 18px Inter, Arial';
+  ctx.fillText('Приглашение', -cardW/2 + 18, 28);
+  ctx.font = '400 13px Inter, Arial';
+  ctx.fillStyle = '#444';
+  ctx.fillText('Вас ждёт наш день', -cardW/2 + 18, 54);
+  ctx.restore();
 }
 
+/* helper: rounded rect stroke/fill */
+function roundRect(ctx,x,y,w,h,r,fill,stroke){
+  if(typeof r === 'number') r = {tl:r, tr:r, br:r, bl:r};
+  ctx.beginPath();
+  ctx.moveTo(x + r.tl, y);
+  ctx.lineTo(x + w - r.tr, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r.tr);
+  ctx.lineTo(x + w, y + h - r.br);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r.br, y + h);
+  ctx.lineTo(x + r.bl, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r.bl);
+  ctx.lineTo(x, y + r.tl);
+  ctx.quadraticCurveTo(x, y, x + r.tl, y);
+  ctx.closePath();
+  if(fill) ctx.fill();
+  if(stroke) ctx.stroke();
+}
 
-/* -------------------------------
-   loop
---------------------------------*/
-
+/* loop */
 function loop(){
-
-  update()
-  draw()
-  requestAnimationFrame(loop)
-
+  updatePhysics();
+  draw();
+  requestAnimationFrame(loop);
 }
-
-loop()
+loop();
 
 </script>
 </body>
