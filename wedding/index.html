@@ -408,7 +408,7 @@ window.addEventListener('pointerdown', function(e){
     setDraggingState(true);
     startYHero = e.clientY; startProgress = progress;
     lastMoveTime = performance.now(); lastMoveY = e.clientY; velocityHero = 0;
-    e.preventDefault && e.preventDefault();
+    //e.preventDefault && e.preventDefault();
     return;
   }
   // if click on slides area while hero open, ignore (hero should handle swipe)
