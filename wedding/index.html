@@ -532,19 +532,15 @@ async function loadSVGSlides(){
 }
 
 function replaceGuestText(){
+
   const params = new URLSearchParams(window.location.search);
   const guestText = params.get("guest");
-  const guestText2 = params.get("guest2");
-  if (!guestText) return;
-  const tspans = document.querySelectorAll(".svg-slide tspan");
-  tspans.forEach(el => {
-    if (el.textContent.trim() === "Дорогие и") {
-      el.textContent = guestText;
-    }
-    if (el.textContent.trim() === "любимые Гости!") {
-      el.textContent = guestText2;
-    }
-  });
+
+  const guestMessage = document.getElementById("guestMessage");
+  if(!guestMessage || !guestText) return;
+
+  guestMessage.textContent = guestText;
+
 }
 
 loadSVGSlides();
