@@ -139,7 +139,7 @@ html,body{
   transform:translateX(-50%) scale(1);
 
   font-size:32px;
-  color:#2b2b2b;
+  color:#e52629;
   font-family:"Georgia";
 
   text-align:center;         /* центр текста внутри блока */
@@ -147,6 +147,28 @@ html,body{
   pointer-events:none;
   z-index:300;
   transition:transform .25s cubic-bezier(.22,.61,.36,1);
+}
+
+
+.guest-message{
+  position:absolute;
+  left:50%;
+  top:16vh;
+
+  width:70%;                 /* ширина контейнера */
+  transform:translateX(-50%) scale(1);
+
+  font-size:32px;
+  color:#e52629;
+  font-family:"Georgia";
+
+  text-align:center;         /* центр текста внутри блока */
+
+  /* 
+  pointer-events:none;
+  z-index:300;
+  transition:transform .25s cubic-bezier(.22,.61,.36,1);
+   */
 }
   
 </style>
@@ -190,6 +212,7 @@ html,body{
 
     <section class="slide">
         <div class="svg-slide" data-src="slides/2.svg"></div>
+        <div class="guest-message" id="guestMessage">Дорогие и любимые Гости!</div>
     </section>
     
     <section class="slide">
