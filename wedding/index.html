@@ -2,32 +2,32 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
-<title>Приглашение — оптимизировано</title>
-
-<!-- preload font -->
-<link rel="preload" href="fonts/segoesc.ttf" as="font" type="font/ttf" crossorigin>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Приглашение</title>
+  <meta property="og:title" content="Мы женимся! 🎉">
+  <meta property="og:description" content="Приглашаем тебя на свадьбу! Подробности на странице.">
+  <meta property="og:image" content="https://andreich1310.github.io/preview.jpg">
+  <meta property="og:url" content="https://andreich1310.github.io/">
+  <meta property="og:type" content="website">
 
 <style>
 :root{
-  --gap-start:.25;
+  --gap-start:.5;
   --gap-end:50;
 }
 
-/* font */
 @font-face{
   font-family: "SegoeScript";
   src: url("fonts/segoesc.ttf") format("truetype");
   font-weight: normal;
   font-style: normal;
-  font-display: swap;
 }
 
 html,body{
   height:100%;
   margin:0;
   overflow:hidden;
-  font-family: "SegoeScript", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+  font-family: "SegoeScript";
   background:#FAF6C9;
 }
 
@@ -42,7 +42,6 @@ html,body{
   touch-action:none;
 }
 
-/* disable transitions while dragging to avoid layout thrash */
 .hero.dragging .door,
 .hero.dragging .panel,
 .hero.dragging .door img,
@@ -51,124 +50,144 @@ html,body{
   transition:none !important;
 }
 
-.door{
-  width:50%;
-  height:100%;
-  position:relative;
-  transform-style:preserve-3d;
-  will-change:transform;
-  overflow:visible;
-  backface-visibility:hidden;
-}
-.left{ transform-origin:right center; }
-.right{ transform-origin:left center; }
+.door{ width:50%; height:100%; position:relative; transform-style:preserve-3d; will-change:transform; overflow:visible; }
+.left{ transform-origin:right center; } .right{ transform-origin:left center; }
 
-.panel{
-  position:absolute;
-  inset:0;
-  transform-style:preserve-3d;
-  will-change:transform;
-  transition:transform .35s cubic-bezier(.22,.61,.36,1);
-}
-.left .panel{ transform-origin:right bottom; }
-.right .panel{ transform-origin:left bottom; }
+.panel{ position:absolute; inset:0; transform-style:preserve-3d; will-change:transform; transition:transform .35s cubic-bezier(.22,.61,.36,1); }
+.left .panel{ transform-origin:right bottom; } .right .panel{ transform-origin:left bottom; }
 
-.panel::before{
-  content:"";
-  position:absolute;
-  inset:0;
-  border:1px solid rgba(0,0,0,.08);
-  pointer-events:none;
-  z-index:70;
-}
+.panel::before{ content:""; position:absolute; inset:0; border:1px solid rgba(0,0,0,.08); pointer-events:none; z-index:70; }
+.panel img{ width:100%; height:100%; object-fit:cover; display:block; position:relative; z-index:60; will-change:transform; transition:transform .35s cubic-bezier(.22,.61,.36,1); }
+.left .panel img{ object-position:left center; } .right .panel img{ object-position:right center; }
 
-/* left shows left part of image, right shows right */
-.panel img{
-  width:100%;
-  height:100%;
-  object-fit:cover;
-  display:block;
-  position:relative;
-  z-index:60;
-  will-change:transform;
-  transition:transform .35s cubic-bezier(.22,.61,.36,1);
-}
-.left .panel img{ object-position:left center; }
-.right .panel img{ object-position:right center; }
-
-/* shadow under doors */
-.door-shadow{
-  position:absolute;
-  top:0;
-  bottom:0;
-  width:10vw;
-  filter:blur(18px);
-  opacity:.9;
-  pointer-events:none;
-  transform-style:preserve-3d;
-  transition: opacity .22s linear, transform .22s linear;
-  transform: translateZ(-80px);
-  z-index:1; /* behind slide content */
-}
+/* тень под створкой — теперь видна (z-index и позиционирование) */
+.door-shadow{ position:absolute; top:0; bottom:0; width:10vw; filter:blur(18px); opacity:.9; pointer-events:none; transform-style:preserve-3d; transition: opacity .22s linear, transform .22s linear; transform: translateZ(-80px); z-index:1; }
 .door-shadow.left{ right:6vw; background:linear-gradient(to right,rgba(0,0,0,.72), rgba(0,0,0,.32), transparent); }
-.door-shadow.right{ left:6vw;  background:linear-gradient(to left,rgba(0,0,0,.72), rgba(0,0,0,.32), transparent); }
+.door-shadow.right{ left:6vw; background:linear-gradient(to left,rgba(0,0,0,.72), rgba(0,0,0,.32), transparent); }
 
-.inner-edge{
-  position:absolute; top:0; bottom:0; width:16px; z-index:90; pointer-events:none; mix-blend-mode:multiply;
-}
+.inner-edge{ position:absolute; top:0; bottom:0; width:16px; z-index:90; pointer-events:none; mix-blend-mode:multiply; }
 .left .inner-edge{ right:0; background:linear-gradient(to left, rgba(0,0,0,.46), rgba(0,0,0,.06) 36%, transparent 100%); }
 .right .inner-edge{ left:0; background:linear-gradient(to right, rgba(0,0,0,.46), rgba(0,0,0,.06) 36%, transparent 100%); }
 
-.hint{
-  position:absolute; left:50%; bottom:12vh; transform:translateX(-50%); z-index:120;
-  display:flex; flex-direction:column; align-items:center; gap:8px; pointer-events:none; transition:opacity .18s;
-}
-.hint svg{ width:28px; height:28px; display:block; animation:bob 1.2s infinite ease-in-out; }
-@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.hint{ position:absolute; left:50%; bottom:12vh; transform:translateX(-50%); z-index:120; display:flex; flex-direction:column; align-items:center; gap:8px; pointer-events:none; transition:opacity .18s; }
+.hint svg{ width:28px; height:28px; display:block; animation:bob 1.2s infinite ease-in-out; } @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
 .label{ background:rgba(255,255,255,.96); padding:6px 12px; border-radius:999px; box-shadow:0 6px 18px rgba(0,0,0,.08); font-size:13px; }
 
 /* cinematic gap light */
 .gap-light{ position:absolute; left:50%; top:0; bottom:0; width:6px; transform:translateX(-50%); pointer-events:none; z-index:20; background: linear-gradient(180deg, rgba(255,245,220,0.95), rgba(255,230,160,0.6)); filter: blur(18px); opacity:0; transition: opacity .26s linear, width .26s linear; }
 
-/* SLIDER */
-.slider{ position:relative; height:100dvh; overflow:hidden; touch-action:none; -webkit-user-select:none; user-select:none; }
-.slides{ position:relative; will-change:transform; } /* hint: will-change during anim, cleared later */
+/* SLIDER: JS-controlled */
+.slider{
+  position:relative;
+  height:100vh;
+  height:100dvh;
+  overflow:hidden;
+  touch-action:none;
+  -webkit-user-select:none;
+  user-select:none;
+}
+
+.slides{
+  position:relative;
+}
+
 .slide{
+  height:100vh;
   height:100dvh;
   width:100%;
   position:relative;
+
   display:flex;
   align-items:center;
   justify-content:center;
-  box-sizing:border-box;
+}
+.slide img{ width:100%; height:100%; object-fit:cover; display:block; }
+.slide svg { width: 100%; height: 100%; display: block; }
+
+/* заставляем контейнер SVG занимать всю область слайда,
+   а сам SVG масштабироваться с сохранением пропорций */
+.svg-slide {
+  width: 100%;
+  height: 100%;
+  display: block;
+  box-sizing: border-box;
 }
 
-/* show svg via <img> (fast) */
-.svg-slide img{
-  width:100%;
-  height:100%;
-  object-fit:contain;
-  display:block;
+.svg-slide svg {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+  /* для inline-SVG: сохраняем соотношение и центрируем */
+  preserveAspectRatio: xMidYMid meet;
+}
+  
+@media (max-width:520px){
+  .door-shadow{ width:14vw; filter:blur(12px); }
+  .inner-edge{ width:12px; }
+  .door-shadow.left{ right:-10vw; }
+  .door-shadow.right{ left:-10vw; }
+  .gap-light{ width:10px; }
 }
 
-/* container for possible overlays */
-.svg-slide{ width:100%; height:100%; display:block; box-sizing:border-box; }
-
-/* messages */
-.slide-hint{ position:absolute; left:50%; bottom:10vh; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; gap:6px; z-index:200; pointer-events:none; opacity:0; transition:opacity .35s; }
+/* --- slide hint --- */
+.slide-hint{
+  position:absolute;
+  left:50%;
+  bottom:10vh;
+  transform:translateX(-50%);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:6px;
+  z-index:200;
+  pointer-events:none;
+  opacity:0;
+  transition:opacity .35s;
+}
 .slide-hint svg{ width:28px; height:28px; animation:slideHintMove 1.4s infinite ease-in-out; }
 @keyframes slideHintMove{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-10px); } }
 .slide-hint-text{ background:rgba(255,255,255,.9); padding:6px 12px; border-radius:999px; font-size:13px; box-shadow:0 6px 18px rgba(0,0,0,.08); }
 
-.end-message{ position:absolute; left:50%; top:66vh; width:80%; transform:translateX(-50%) scale(1); font-size:7vw; color:#7c170f; text-align:center; pointer-events:none; z-index:300; transition:transform .25s cubic-bezier(.22,.61,.36,1); }
-.guest-message{ position:absolute; left:50%; bottom:65vh; width:70%; transform:translateX(-50%) scale(1); font-size:8vw; color:#e52629; font-family:"Georgia"; text-align:center; }
+/* --- end message --- */
+.end-message{
+  position:absolute;
+  left:50%;
+  top:66vh;
 
-/* small screens */
-@media (max-width:520px){
-  .door-shadow{ width:14vw; filter:blur(12px); } .inner-edge{ width:12px; } .door-shadow.left{ right:-10vw; } .door-shadow.right{ left:-10vw; } .gap-light{ width:10px; }
+  width:80%;                 /* ширина контейнера */
+  transform:translateX(-50%) scale(1);
+
+  font-size:7vw;  
+  color:#7c170f;
+  /*font-family:"SegoeScript";*/
+
+  text-align:center;         /* центр текста внутри блока */
+
+  pointer-events:none;
+  z-index:300;
+  transition:transform .25s cubic-bezier(.22,.61,.36,1);
 }
+
+
+.guest-message{
+  position:absolute;
+  left:50%;
+  bottom:65vh;
+
+  width:70%;                 /* ширина контейнера */
+  transform:translateX(-50%) scale(1);
+
+  font-size:8vw;
+  color:#e52629;
+  font-family:"Georgia";
+
+  text-align:center;         /* центр текста внутри блока */
+
+}
+  
 </style>
 </head>
+
 <body>
 
 <div class="hero" id="hero" aria-hidden="false">
@@ -202,37 +221,38 @@ html,body{
   <div class="slides" id="slides">
 
     <section class="slide">
-      <div class="svg-slide" data-src="slides/v0.47 + текст_1.svg"></div>
+        <div class="svg-slide" data-src="slides/v0.47 + текст_1.svg"></div>
     </section>
 
     <section class="slide">
-      <div class="svg-slide" data-src="slides/2.svg"></div>
-      <div class="guest-message" id="guestMessage">Дорогие и любимые Гости!</div>
+        <div class="svg-slide" data-src="slides/2.svg"></div>
+        <div class="guest-message" id="guestMessage">Дорогие и любимые Гости!</div>
+    </section>
+    
+    <section class="slide">
+        <div class="svg-slide" data-src="slides/3.svg"></div>
+    </section>
+    
+    <section class="slide">
+        <div class="svg-slide" data-src="slides/4.svg"></div>
     </section>
 
     <section class="slide">
-      <div class="svg-slide" data-src="slides/3.svg"></div>
+        <div class="svg-slide" data-src="slides/5.svg"></div>
     </section>
-
+    
     <section class="slide">
-      <div class="svg-slide" data-src="slides/4.svg"></div>
+        <div class="svg-slide" data-src="slides/6.svg"></div>
     </section>
-
+    
     <section class="slide">
-      <div class="svg-slide" data-src="slides/5.svg"></div>
+        <div class="svg-slide" data-src="slides/7.svg"></div>
+        <div class="end-message" id="endMessage">Будем рады видеть вас рядом с нами!</div>
     </section>
-
-    <section class="slide">
-      <div class="svg-slide" data-src="slides/6.svg"></div>
-    </section>
-
-    <section class="slide">
-      <div class="svg-slide" data-src="slides/7.svg"></div>
-      <div class="end-message" id="endMessage">Будем рады видеть вас рядом с нами!</div>
-    </section>
-
+    
   </div>
 
+  <!-- подсказка свайпа (появляется после открытия обложки, скрывается после первого свайпа) -->
   <div class="slide-hint" id="slideHint" aria-hidden="true">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -240,14 +260,14 @@ html,body{
     </svg>
     <div class="slide-hint-text">Листай</div>
   </div>
+
 </div>
 
 <script>
-/* ========= core interaction logic (kept, optimized) ========= */
 (function(){
-
-/* DOM refs */
+/* ---------- elements ---------- */
 const hero = document.getElementById('hero');
+const gapLight = document.getElementById('gapLight');
 const leftDoor = document.getElementById('leftDoor');
 const rightDoor = document.getElementById('rightDoor');
 const leftPanel = leftDoor.querySelector('.panel');
@@ -258,34 +278,33 @@ const leftShadow = leftDoor.querySelector('.door-shadow');
 const rightShadow = rightDoor.querySelector('.door-shadow');
 const hint = document.getElementById('hint');
 
+const slider = document.getElementById('slider');
 const slidesWrap = document.getElementById('slides');
-const slideEls = Array.from(document.querySelectorAll('.slide'));
-const svgContainers = Array.from(document.querySelectorAll('.svg-slide'));
-const slideCount = slideEls.length;
+const slides = Array.from(slidesWrap.querySelectorAll('.slide'));
+const slideCount = slides.length;
 
 const slideHint = document.getElementById('slideHint');
 const endMessage = document.getElementById('endMessage');
-const guestMessage = document.getElementById('guestMessage');
 
-/* settings */
+/* ---------- settings ---------- */
 const SWIPE_DISTANCE_FACTOR = 0.12;
 const SLIDE_SWIPE_THRESHOLD_PX = 60;
 const SLIDE_ANIM_TIME = 420;
 const IMAGE_Z_MULT = 20;
 const DISABLE_HERO_AT = 0.98;
 
-/* read CSS vars */
-const initialGap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gap-start')) || 0.25;
+const initialGap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gap-start')) || 0.5;
 const maxGap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gap-end')) || 50;
 const rot = 38;
 const FADE_START = 0.93;
 const FADE_END = 0.98;
 
-/* state */
+/* ---------- state ---------- */
 let progress = 0;
 let rafId = 0, pendingProgress = 0;
 let didVibrate = false;
 
+/* hero drag state */
 let isDraggingHero = false;
 let startYHero = 0;
 let startProgress = 0;
@@ -293,17 +312,17 @@ let lastMoveTime = 0;
 let lastMoveY = 0;
 let velocityHero = 0;
 
+/* slider state */
 let currentSlide = 0;
 let locked = false;
 let sliderDragging = false;
 let sStartY = 0, sStartTranslate = 0, sLastTime = 0, sLastY = 0, sVelocity = 0;
 
-/* prefer visualViewport height */
-const vh = ()=> window.visualViewport ? window.visualViewport.height : window.innerHeight;
+const vh = ()=> window.innerHeight;
 const clamp01 = v => Math.max(0, Math.min(1, v));
 const clampIndex = i => Math.max(0, Math.min(slideCount - 1, i));
 
-/* ---------- rendering hero (rAF batched) ---------- */
+/* ---------- helper: render hero ---------- */
 function renderHero(p){
   progress = clamp01(p);
   const shift = initialGap + progress * (maxGap - initialGap);
@@ -325,14 +344,16 @@ function renderHero(p){
   rightShadow.style.opacity = String(Math.max(0, 0.9 - progress * 0.85));
   hint.style.opacity = String(Math.max(0, 1 - progress * 1.6));
 
-  const lightStart = 0.12, lightEnd = 0.9;
+  const lightStart = 0.12;
+  const lightEnd = 0.9;
   if(progress <= lightStart){
     gapLight.style.opacity = '0';
     gapLight.style.width = '6px';
   } else {
     const lt = Math.min(1, (progress - lightStart) / (lightEnd - lightStart));
     gapLight.style.opacity = String(lt * 0.95);
-    gapLight.style.width = `${6 + lt * 18}px`;
+    const w = 6 + lt * 18;
+    gapLight.style.width = `${w}px`;
   }
 
   let fade = 1;
@@ -342,24 +363,28 @@ function renderHero(p){
   }
   hero.style.opacity = String(Math.max(0, fade));
 
+  // hero visibility for slider logic
   const heroVisible = progress < DISABLE_HERO_AT;
   hero.style.pointerEvents = heroVisible ? 'auto' : 'none';
   hero.setAttribute('aria-hidden', heroVisible ? 'false' : 'true');
 
+  // vibration & show slide hint once on open
   if(progress >= DISABLE_HERO_AT && !didVibrate){
     didVibrate = true;
-    try{ navigator.vibrate && navigator.vibrate(8); }catch(e){}
+    try { navigator.vibrate && navigator.vibrate(8); } catch(e){}
     if(slideHint) slideHint.style.opacity = '1';
   }
   if(progress < DISABLE_HERO_AT && didVibrate) didVibrate = false;
 }
 
+/* rAF batching (hero) */
 function scheduleHeroRender(p){
   pendingProgress = clamp01(p);
   if(rafId) return;
   rafId = requestAnimationFrame(()=>{ rafId = 0; renderHero(pendingProgress); });
 }
 
+/* animate hero to target with overshoot */
 function animateHeroTo(target, duration=420){
   const from = progress;
   const start = performance.now();
@@ -373,27 +398,28 @@ function animateHeroTo(target, duration=420){
   requestAnimationFrame(step);
 }
 
-/* ---------- slides helpers ---------- */
+/* ---------- slider controller ---------- */
 function setSlidesTransform(translateY, animate = false){
   if(animate) slidesWrap.style.transition = `transform ${SLIDE_ANIM_TIME}ms cubic-bezier(.22,.61,.36,1)`;
   else slidesWrap.style.transition = 'none';
-  // use translate3d to encourage GPU compositing
-  slidesWrap.style.transform = `translate3d(0, ${translateY}px, 0)`;
+  slidesWrap.style.transform = `translateY(${translateY}px)`;
 }
 function goToSlide(index, animate = true){
   index = clampIndex(index);
   if(locked) return;
+  // hide slide hint on navigation
   if(slideHint) slideHint.style.opacity = '0';
   locked = true;
-  // temporarily set will-change to ensure smoothness, then clear after transition
-  slidesWrap.style.willChange = 'transform';
   const to = -index * vh();
   setSlidesTransform(to, animate);
-  setTimeout(()=>{ locked = false; currentSlide = index; slidesWrap.style.willChange = 'auto'; }, SLIDE_ANIM_TIME + 20);
+  setTimeout(()=>{ locked = false; currentSlide = index; }, SLIDE_ANIM_TIME + 20);
 }
 
-/* pointer handlers (slider) */
+/* slider pointer handlers */
 function onSliderPointerDown(e){
+  // hide slide hint on first interaction
+  if(slideHint) slideHint.style.opacity = '0';
+
   if(hero.style.pointerEvents !== 'none') return;
   if(locked) return;
   slider.setPointerCapture && slider.setPointerCapture(e.pointerId);
@@ -416,9 +442,11 @@ function onSliderPointerMove(e){
   const v = (sLastY - e.clientY) / dt;
   sVelocity = sVelocity * 0.6 + v * 0.4;
   sLastTime = now; sLastY = e.clientY;
+  // overscroll effect for end message on last slide
   if(currentSlide === slideCount - 1 && endMessage){
+    // when dragging up beyond last slide, dy becomes negative -> overscroll positive
     const overscroll = Math.max(0, - (e.clientY - sStartY));
-    const scale = 1 + Math.min(overscroll / 300, 0.3);
+    const scale = 1 + Math.min(overscroll / 300, 0.4);
     endMessage.style.transform = `translateX(-50%) scale(${scale})`;
   }
   e.preventDefault && e.preventDefault();
@@ -430,6 +458,8 @@ function onSliderPointerUp(e){
   const dy = sStartY - e.clientY;
   const absDy = Math.abs(dy);
   const swipeThreshold = SLIDE_SWIPE_THRESHOLD_PX;
+  const projected = sStartTranslate - sVelocity * 180;
+  const projectedIndex = Math.round(-projected / vh());
   let target = currentSlide;
   if(absDy > swipeThreshold){
     target = dy > 0 ? Math.min(currentSlide + 1, slideCount - 1) : Math.max(currentSlide - 1, 0);
@@ -439,6 +469,7 @@ function onSliderPointerUp(e){
     else target = clampIndex(Math.round(- (sStartTranslate) / vh()));
   }
   goToSlide(target, true);
+  // reset end message size
   if(endMessage) endMessage.style.transform = "translateX(-50%) scale(1)";
   e.preventDefault && e.preventDefault();
 }
@@ -447,20 +478,10 @@ function onSliderPointerUp(e){
 slidesWrap.addEventListener('pointerdown', onSliderPointerDown, { passive:false });
 window.addEventListener('pointermove', onSliderPointerMove, { passive:false });
 window.addEventListener('pointerup', onSliderPointerUp, { passive:false });
-slidesWrap.addEventListener('wheel', function(e){
-  if(hero.style.pointerEvents === 'none'){
-    e.preventDefault();
-    goToSlide(currentSlide + (e.deltaY>0?1:-1), true);
-  }
-}, { passive:false });
-window.addEventListener('keydown', function(e){
-  if(hero.style.pointerEvents === 'none'){
-    if(e.key==='ArrowDown'||e.key==='PageDown'){ e.preventDefault(); goToSlide(currentSlide+1,true); }
-    if(e.key==='ArrowUp'||e.key==='PageUp'){ e.preventDefault(); goToSlide(currentSlide-1,true); }
-  }
-});
+slidesWrap.addEventListener('wheel', function(e){ if(hero.style.pointerEvents === 'none') { e.preventDefault(); goToSlide(currentSlide + (e.deltaY>0?1:-1), true); } }, { passive:false });
+window.addEventListener('keydown', function(e){ if(hero.style.pointerEvents === 'none'){ if(e.key==='ArrowDown'||e.key==='PageDown'){ e.preventDefault(); goToSlide(currentSlide+1,true);} if(e.key==='ArrowUp'||e.key==='PageUp'){ e.preventDefault(); goToSlide(currentSlide-1,true);} } });
 
-/* hero pointer handlers */
+/* ---------- HERO pointer handlers ---------- */
 hero.addEventListener('pointerdown', function(e){
   if(hero.style.pointerEvents === 'none') return;
   hero.setPointerCapture && hero.setPointerCapture(e.pointerId);
@@ -478,7 +499,7 @@ window.addEventListener('pointermove', function(e){
   if(!isDraggingHero) return;
   const now = performance.now();
   const dy = startYHero - e.clientY;
-  const swipeDistance = vh() * SWIPE_DISTANCE_FACTOR;
+  const swipeDistance = window.innerHeight * SWIPE_DISTANCE_FACTOR;
   const deltaProgress = dy / swipeDistance;
   scheduleHeroRender(startProgress + deltaProgress);
   const dt = Math.max(8, now - lastMoveTime);
@@ -494,7 +515,7 @@ window.addEventListener('pointerup', function(e){
   hero.classList.remove('dragging');
   hero.releasePointerCapture && hero.releasePointerCapture(e.pointerId);
   const projectionMs = 180;
-  const projected = clamp01(progress + velocityHero * projectionMs / (vh() * SWIPE_DISTANCE_FACTOR));
+  const projected = clamp01(progress + velocityHero * projectionMs / (window.innerHeight * SWIPE_DISTANCE_FACTOR));
   const target = (projected > 0.5) ? 1 : 0;
   const dist = Math.abs(target - progress);
   const dur = Math.min(700, Math.max(180, 280 + dist * 480));
@@ -502,75 +523,43 @@ window.addEventListener('pointerup', function(e){
   e.preventDefault && e.preventDefault();
 }, { passive:false });
 
-/* keep layout correct on resize */
-function onViewportChange(){
-  setSlidesTransform(-currentSlide * vh(), false);
-  renderHero(progress);
-}
-window.addEventListener('resize', onViewportChange);
-if(window.visualViewport) window.visualViewport.addEventListener('resize', onViewportChange);
-
-/* init */
+/* ---------- init ---------- */
 setSlidesTransform(0, false);
 renderHero(0);
-
-/* ===== optimized SVG slide loading (no inlining during swipe) =====
-   - Insert <img> into each .svg-slide.
-   - For slide 0 and 1: eager + high priority (to avoid 1<->2 jank).
-   - Others: lazy + decode in background (idle).
-   - We DON'T inline SVG into DOM during navigation; keeps transitions smooth.
-*/
-(function loadSlideImages(){
-  // Determine URLs and set up images
-  svgContainers.forEach((container, idx) => {
-    const url = container.dataset.src;
-    if(!url) return;
-    // create image element
-    const img = document.createElement('img');
-    img.alt = '';
-    img.decoding = 'async';
-    // first two slides: load eagerly (avoid jank when switching from 1 to 2)
-    if(idx <= 1){
-      img.loading = 'eager';          // immediate load
-      img.fetchPriority = 'high';     // hint to browser
-      // also add a preload link into head for strongest effect
-      try{
-        const link = document.createElement('link');
-        link.rel = 'preload';
-        link.as = 'image';
-        link.href = url;
-        document.head.appendChild(link);
-      }catch(e){}
-    } else {
-      img.loading = 'lazy';           // lazy-load others
-      img.fetchPriority = 'low';
-    }
-    // set sizing behaviour
-    img.style.width = '100%';
-    img.style.height = '100%';
-    img.style.objectFit = 'contain';
-    img.style.display = 'block';
-    // attach placeholder immediately (fast paint)
-    container.appendChild(img);
-    // start load and decode asynchronously
-    img.src = url;
-    // decode to ensure it's ready when shown; errors are ignored
-    img.decode && img.decode().catch(()=>{ /* ignore decode errors */ });
-  });
 })();
 
-/* ---------- replace guest message from URL param ---------- */
-(function replaceGuestText(){
+/* ---------- lazy-load SVG slides and personalize --------- */
+async function loadSVGSlides(){
+  const containers = document.querySelectorAll(".svg-slide");
+  for(const el of containers){
+    const url = el.dataset.src;
+    try {
+      const res = await fetch(url);
+      const svgText = await res.text();
+      el.innerHTML = svgText;
+    } catch(err){
+      // ignore load error, leave placeholder
+      console.warn("SVG load failed for", url, err);
+    }
+  }
+  replaceGuestText();
+}
+
+function replaceGuestText(){
+
   const params = new URLSearchParams(window.location.search);
   const guestText = params.get("guest");
-  if(!guestText) return;
-  const decoded = guestText.replace(/\\n/g, '\n');
-  if(guestMessage){
-    guestMessage.textContent = decoded;
-  }
-})();
 
-})(); /* IIFE end */
+  const guestMessage = document.getElementById("guestMessage");
+  if(!guestMessage || !guestText) return;
+
+  guestMessage.textContent = guestText;
+
+}
+
+loadSVGSlides();
+
 </script>
+
 </body>
 </html>
