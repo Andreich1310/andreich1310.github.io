@@ -551,7 +551,6 @@ function replaceGuestText(){
   const guestMessage = document.getElementById('guestMessage');
   if(!guestMessage) return;
 
-  // fallback: если нет параметра — оставляем стандарт
   if(!guestParam){
     guestMessage.textContent = guestMessage.textContent || "Дорогие гости!";
     return;
@@ -559,7 +558,6 @@ function replaceGuestText(){
 
   const guest = decodeURIComponent(guestParam.trim());
 
-  // определяем единственное/множественное (простое правило)
   const isPlural =
     guest.includes(" и ") ||
     guest.includes(",") ||
@@ -568,10 +566,9 @@ function replaceGuestText(){
   const prefix = isPlural ? "Дорогие " : "Дорогой ";
   guestMessage.textContent = prefix + guest + "!";
 
-  // если множественное — не меняем формы
-  if(isPlural) return;
+  if(isPlural) return; // для нескольких гостей не меняем формы
 
-  // словарь замен — добавляй пары по необходимости
+  // словарь замен — добавляй пары сюда
   const DICT = {
     "вы": "ты",
     "вас": "тебя",
@@ -586,45 +583,68 @@ function replaceGuestText(){
     return replacement;
   };
 
-  // находим контейнер по атрибуту data-src="slides/2.svg" (или заканчивающийся на 2.svg)
+  // найти контейнер по data-src="slides/2.svg" (или заканчивающемуся на "2.svg")
   const allSlides = Array.from(document.querySelectorAll('.svg-slide'));
   let container = allSlides.find(el => {
     const ds = el.getAttribute('data-src') || '';
     return ds === 'slides/2.svg' || ds.endsWith('/2.svg') || ds.endsWith('2.svg');
   });
   if(!container && allSlides.length >= 2) container = allSlides[1];
-  if(!container) return;
+  if(!container) { console.warn('replaceGuestText: target svg-slide not found'); return; }
 
   const svg = container.querySelector('svg');
-  if(!svg) return;
+  if(!svg) { console.warn('replaceGuestText: svg not in container yet'); return; }
 
-  // --- REPLACEMENT: unicode-friendly word boundaries ---
-  // регулярка: (начало или не-буква) (слово) (?= не-буква или конец)
-  // флаги: g - глобально, i - регистронезависимо, u - unicode (нужен для \p{L} в других вариантах)
   let totalReplacements = 0;
+  let totalAdjustments = 0;
 
-  Object.entries(DICT).forEach(([from, to]) => {
-    // build regex that matches the word with unicode-aware boundaries
-    // capture preceding character (if any) to preserve it in replacement
-    const re = new RegExp('(^|[^\\p{L}])(' + escapeRegExp(from) + ')(?=[^\\p{L}]|$)', 'giu');
+  // пройдёмся по каждому <tspan> и <text> внутри нужного svg
+  const nodes = Array.from(svg.querySelectorAll('tspan, text'));
 
-    // перебираем все text/tspan внутри svg
-    svg.querySelectorAll('text, tspan').forEach(node => {
-      // callback получает (match, p1, p2, offset, string)
-      const newText = node.textContent.replace(re, (match, p1, p2) => {
-        // p1 — либо '' (если начало строки), либо символ-граница
-        const replaced = preserveCase(p2, to);
-        // считаем, сколько замен сделали (можем прибавить на основе длины)
+  nodes.forEach(node => {
+    // сохраним исходную длину (если доступна)
+    let origLen = null;
+    try {
+      if(typeof node.getComputedTextLength === 'function') origLen = node.getComputedTextLength();
+    } catch(e) { origLen = null; }
+
+    let text = node.textContent;
+
+    // для каждой пары слов делаем unicode-aware замену (без \b, т.к. он нестабилен для кириллицы)
+    // используем границы через \p{L} (нужен флаг u)
+    Object.entries(DICT).forEach(([from, to]) => {
+      const re = new RegExp('(^|[^\\p{L}])(' + escapeRegExp(from) + ')(?=[^\\p{L}]|$)', 'giu');
+      text = text.replace(re, (match, p1, p2) => {
         totalReplacements++;
-        return (p1 || '') + replaced;
+        return (p1 || '') + preserveCase(p2, to);
       });
-      node.textContent = newText;
     });
+
+    // если текст изменился — записываем и при необходимости корректируем ширину
+    if(text !== node.textContent){
+      node.textContent = text;
+
+      // попробуем корректировать длину добавлением тонких пробелов, если текст стал короче
+      if(origLen !== null && typeof node.getComputedTextLength === 'function'){
+        let newLen;
+        try { newLen = node.getComputedTextLength(); } catch(e){ newLen = null; }
+        // небольшая допустимая погрешность в пикселях
+        const TOL = 0.6;
+        let iter = 0;
+        // не больше 12 добавлений, чтобы не наращивать слишком много знаков
+        while(newLen !== null && newLen + TOL < origLen && iter < 12){
+          node.textContent = node.textContent + '\u200A'; // hair space
+          iter++;
+          totalAdjustments++;
+          try { newLen = node.getComputedTextLength(); } catch(e){ newLen = null; break; }
+        }
+      }
+    }
   });
 
-  alert('replaceGuestText: total replacements =', totalReplacements);
-  // alert('ok: ' + totalReplacements);
+  console.info('replaceGuestText: replacements=', totalReplacements, 'adjustments(hair-spaces)=', totalAdjustments);
 }
+  
 loadSVGSlides();
 
 </script>
