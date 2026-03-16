@@ -764,9 +764,11 @@ function replaceGuestText(){
   const DICT = {
     "вы": "ты",
     "вас": "тебя",
-    "были": "был"
+    "были": "была"
   };
 
+  
+  
   const escapeRegExp = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const preserveCase = (match, replacement) => {
     if(!match) return replacement;
