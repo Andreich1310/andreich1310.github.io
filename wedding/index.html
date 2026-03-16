@@ -548,13 +548,22 @@ async function loadSVGSlides(){
 function replaceGuestText(){
 
   const params = new URLSearchParams(window.location.search);
-  const guestText = params.get("guest");
+  let guestText = params.get("guest");
 
   const guestMessage = document.getElementById("guestMessage");
   if(!guestMessage || !guestText) return;
 
-  guestMessage.textContent = guestText;
+  guestText = decodeURIComponent(guestText);
 
+  // проверяем множественное число
+  const isPlural =
+    guestText.includes(" и ") ||
+    guestText.includes(",") ||
+    guestText.includes("&");
+
+  const prefix = isPlural ? "Дорогие " : "Дорогой ";
+
+  guestMessage.textContent = prefix + guestText + "!";
 }
 
 loadSVGSlides();
