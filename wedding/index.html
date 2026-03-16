@@ -546,15 +546,20 @@ async function loadSVGSlides(){
 }
 
 function replaceGuestText(){
-
   const params = new URLSearchParams(window.location.search);
-  let guest = params.get("guest");
+  let guestParam = params.get('guest');
+  const guestMessage = document.getElementById('guestMessage');
+  if(!guestMessage) return;
 
-  const guestMessage = document.getElementById("guestMessage");
-  if(!guestMessage || !guest) return;
+  // fallback: если нет параметра — оставляем стандарт
+  if(!guestParam){
+    guestMessage.textContent = guestMessage.textContent || "Дорогие гости!";
+    return;
+  }
 
-  guest = decodeURIComponent(guest);
+  const guest = decodeURIComponent(guestParam.trim());
 
+  // определяем единственное/множественное (простое правило)
   const isPlural =
     guest.includes(" и ") ||
     guest.includes(",") ||
@@ -563,47 +568,60 @@ function replaceGuestText(){
   const prefix = isPlural ? "Дорогие " : "Дорогой ";
   guestMessage.textContent = prefix + guest + "!";
 
-  // если гостей несколько — ничего не меняем
+  // если множественное — не меняем формы
   if(isPlural) return;
-  alert("один");
-  // словарь
-  const dict = {
-    "вас": "тебя",
+
+  // словарь замен — добавляй пары по необходимости
+  const DICT = {
     "вы": "ты",
     "были": "был"
   };
 
-  // второй svg-slide
-  const slide = document.querySelectorAll(".svg-slide")[1];
-  if(!slide) return;
+  const escapeRegExp = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-  const tspans = slide.querySelectorAll("tspan");
-  alert(tspans.length);
-  tspans.forEach(tspan => {
+  const preserveCase = (match, replacement) => {
+    if(match === match.toUpperCase()) return replacement.toUpperCase();
+    if(match[0] === match[0].toUpperCase()) return replacement[0].toUpperCase() + replacement.slice(1);
+    return replacement;
+  };
 
-    let text = tspan.textContent;
-
-    Object.entries(dict).forEach(([from,to]) => {
-
-      const re = new RegExp(`\\b${from}\\b`, "gi");
-
-      text = text.replace(re, match => {
-
-        if(match === match.toUpperCase()) return to.toUpperCase();
-        if(match[0] === match[0].toUpperCase())
-          return to.charAt(0).toUpperCase() + to.slice(1);
-
-        return to;
-
-      });
-
-    });
-
-    tspan.textContent = text;
-
+  // ищем контейнер .svg-slide с data-src="slides/2.svg" (точное совпадение) или заканчивающийся на "/2.svg"
+  const allSlides = Array.from(document.querySelectorAll('.svg-slide'));
+  let container = allSlides.find(el => {
+    const ds = el.getAttribute('data-src') || '';
+    return ds === 'slides/2.svg' || ds.endsWith('/2.svg') || ds.endsWith('2.svg');
   });
 
-    }
+  // если не нашли — можно попробовать взять второй по порядку (на случай другой разметки)
+  if(!container && allSlides.length >= 2) {
+    container = allSlides[1];
+  }
+
+  if(!container) {
+    // ничего не делать — нет нужного контейнера
+    // console.warn('replaceGuestText: target svg-slide not found');
+    return;
+  }
+
+  // внутри контейнера ожидаем inline <svg> (loadSVGSlides() должен был вставить)
+  const svg = container.querySelector('svg');
+  if(!svg) {
+    // console.warn('replaceGuestText: svg not in container yet');
+    return;
+  }
+
+  // заменяем только внутри <tspan> (и <text>) — НИЧЕГО не объединяем, чтобы не ломать координаты
+  const nodes = svg.querySelectorAll('tspan, text');
+  Object.entries(DICT).forEach(([from, to])=>{
+    const re = new RegExp('\\b' + escapeRegExp(from) + '\\b', 'giu'); // глобально, регистронезависимо, unicode
+    nodes.forEach(node=>{
+      // заменяем глобально, с сохранением регистра
+      node.textContent = node.textContent.replace(re, m => preserveCase(m, to));
+    });
+  });
+
+  // готово
+  }
 
 loadSVGSlides();
 
