@@ -893,8 +893,92 @@ function replaceGuestText(){
 
   const hair = '\u200A';
   const maxHairAdd = (typeof CONFIG !== 'undefined' && CONFIG.hairspaceMaxAdd) ? CONFIG.hairspaceMaxAdd : 12;
+function replaceGuestText(){
+  // защита — выполним только один раз
+  if(window.__guestTextDone) return;
+  window.__guestTextDone = true;
 
-  // process tspan
+  const params = new URLSearchParams(window.location.search);
+  const guestParam = params.get('guest');
+  const guestMessage = document.getElementById('guestMessage');
+  if(!guestMessage) return;
+
+  if(!guestParam){
+    guestMessage.textContent = guestMessage.textContent || "Дорогие гости!";
+    return;
+  }
+
+  const guestDecoded = guestParam.trim();
+  const endsWithPunct = /[!\?\.]\s*$/.test(guestDecoded);
+  guestMessage.textContent = guestDecoded + (endsWithPunct ? '' : '!');
+
+  const g = guestDecoded.toLowerCase();
+
+  // определяем форму обращения
+  const maleRE = /\bдорогой\b/i;
+  const femaleRE = /\bдорогая\b/i;
+  const pluralRE = /\bдорог(ие)\b/i;
+
+  const isPlural = pluralRE.test(g);
+  const isMale = maleRE.test(g) && !isPlural;
+  const isFemale = femaleRE.test(g) && !isPlural;
+  const isSingular = isMale || isFemale;
+
+  if(!isSingular){
+    console.info('replaceGuestText: plural or unknown — skipping pronoun replacements');
+    return;
+  }
+
+  // динамический словарь замен
+  const DICT = {
+    "вы": "ты",
+    "вас": "тебя",
+    "были": isMale ? "был" : "была"
+  };
+
+  const escapeRegExp = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  const preserveCase = (match, replacement) => {
+    if(!match) return replacement;
+    if(match === match.toUpperCase()) return replacement.toUpperCase();
+    if(match[0] === match[0].toUpperCase()) return replacement[0].toUpperCase() + replacement.slice(1);
+    return replacement;
+  };
+
+  const allSlides = Array.from(document.querySelectorAll('.svg-slide'));
+  const container = allSlides[1]; // второй слайд по индексу
+  if(!container){
+    console.warn('replaceGuestText: svg-slide[1] not found');
+    return;
+  }
+
+  if(!container.dataset.__loaded){
+    fetchAndInsertSVG(container).then(()=> {
+      try{ replaceGuestText(); }catch(e){ console.error(e); }
+    });
+    return;
+  }
+
+  const svg = container.querySelector('svg');
+  if(!svg){
+    console.warn('replaceGuestText: inline svg not found inside target container');
+    return;
+  }
+
+  const TOL = 0.6;
+  let totalReplacements = 0, totalAdjustments = 0;
+
+  // вместо \p{L} используем явный класс букв (кириллица + латиница + ёЁ)
+  // это совместимо со старыми движками JS, не вызывает SyntaxError
+  const letterClass = 'A-Za-zА-Яа-яЁё\u0400-\u04FF';
+  function makeRe(from){
+    return new RegExp('(^|[^' + letterClass + '])(' + escapeRegExp(from) + ')(?=[^' + letterClass + ']|$)', 'giu');
+  }
+
+  const hair = '\u200A';
+  const maxHairAdd = (typeof CONFIG !== 'undefined' && CONFIG.hairspaceMaxAdd) ? CONFIG.hairspaceMaxAdd : 12;
+
+  // обработка <tspan>
   const tspans = Array.from(svg.querySelectorAll('tspan'));
   tspans.forEach(node=>{
     const orig = node.textContent;
@@ -921,7 +1005,7 @@ function replaceGuestText(){
     }
   });
 
-  // process text elements without tspan
+  // обработка <text> без tspan
   const textEls = Array.from(svg.querySelectorAll('text')).filter(t => t.querySelectorAll('tspan').length === 0);
   textEls.forEach(node=>{
     const orig = node.textContent;
