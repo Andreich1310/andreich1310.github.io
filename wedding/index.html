@@ -493,7 +493,7 @@ function ensureSlideLoaded(index){
 /* =========================
    SLIDER (rAF + inertia + snap)
    ========================= */
-(function(){
+ (function(){
   const slidesWrap = document.getElementById('slides');
   if(!slidesWrap) return;
   const slideEls = Array.from(slidesWrap.querySelectorAll('.slide'));
@@ -517,14 +517,27 @@ function ensureSlideLoaded(index){
   let VH = window.innerHeight;
   function updateVH(){ VH = window.innerHeight; }
 
+  // UI elements we will touch
+  const slideHint = document.getElementById('slideHint');
+  const endMessage = document.getElementById('endMessage');
+
+  // slideHint hide state
+  let slideHintHidden = false;
+  function hideSlideHint(){
+    if(!slideHint || slideHintHidden) return;
+    slideHint.style.opacity = '0';
+    slideHint.setAttribute('aria-hidden', 'true');
+    slideHintHidden = true;
+  }
+
   function apply(y, withTransition=false){
     if(withTransition) slidesWrap.style.transition = `transform ${SLIDE_ANIM_MS}ms cubic-bezier(.22,.61,.36,1)`;
     else slidesWrap.style.transition = 'none';
     slidesWrap.style.transform = `translate3d(0, ${y}px, 0)`;
-    // update active slide pointers
+    // update active slide class and pointer-events
     const idx = Math.round(-y / VH);
     slideEls.forEach((s,i)=>{
-      if(i === idx) s.classList.add('active'); else s.classList.remove('active');
+      if(i === idx){ s.classList.add('active'); } else { s.classList.remove('active'); }
     });
   }
 
@@ -538,6 +551,8 @@ function ensureSlideLoaded(index){
 
   function snapTo(i, animate=true){
     i = clamp(i);
+    // hide hint on any navigation
+    hideSlideHint();
     currentIndex = i;
     const to = -i * VH;
     locked = true;
@@ -545,6 +560,8 @@ function ensureSlideLoaded(index){
     if(animate) setTimeout(()=> locked = false, SLIDE_ANIM_MS + 20); else locked = false;
     // ensure neighbors are loaded
     ensureSlideLoaded(i);
+    // reset endMessage transform when we land
+    if(endMessage) endMessage.style.transform = "translateX(-50%) scale(1)";
   }
 
   function momentumAndSnap(initialVel){
@@ -564,6 +581,9 @@ function ensureSlideLoaded(index){
     if(isHeroOpen()) return;
     if(locked) return;
     if(e.isPrimary === false) return;
+    // hide hint on first touch
+    hideSlideHint();
+
     dragging = true;
     pointerId = e.pointerId;
     startY = e.clientY;
@@ -586,6 +606,23 @@ function ensureSlideLoaded(index){
     velocity = velocity * 0.7 + instV * 0.3;
     lastY = e.clientY; lastTime = now;
     scheduleApply(newT, false);
+
+    // overscroll effect on last slide:
+    if(endMessage){
+      const lastIndex = slideCount - 1;
+      // calculate overscroll relative to last slide baseline (-lastIndex * VH)
+      const baseline = -lastIndex * VH;
+      // if we're beyond baseline (more negative), overscroll positive
+      const overscroll = Math.max(0, -(newT - baseline));
+      // scale factor: 1 .. 1.3 for overscroll up to ~300px
+      const scale = 1 + Math.min(overscroll / 300, 0.3);
+      if(currentIndex === lastIndex && overscroll > 0){
+        endMessage.style.transform = `translateX(-50%) scale(${scale})`;
+      } else {
+        endMessage.style.transform = "translateX(-50%) scale(1)";
+      }
+    }
+
     e.preventDefault && e.preventDefault();
   }
   function onUp(e){
@@ -602,6 +639,8 @@ function ensureSlideLoaded(index){
     }
     velocity = 0;
     slidesWrap.style.willChange = '';
+    // reset endMessage scale
+    if(endMessage) endMessage.style.transform = "translateX(-50%) scale(1)";
     e.preventDefault && e.preventDefault();
   }
   function onCancel(e){
@@ -610,6 +649,7 @@ function ensureSlideLoaded(index){
     try{ slidesWrap.releasePointerCapture && slidesWrap.releasePointerCapture(pointerId); }catch(e){}
     snapTo(currentIndex, true);
     slidesWrap.style.willChange = '';
+    if(endMessage) endMessage.style.transform = "translateX(-50%) scale(1)";
   }
 
   // wheel
@@ -618,6 +658,8 @@ function ensureSlideLoaded(index){
     if(isHeroOpen()) return;
     if(locked) return;
     if(wheelLock) return;
+    // hide hint on scroll
+    hideSlideHint();
     wheelLock = true;
     const dir = e.deltaY > 0 ? 1 : -1;
     snapTo(currentIndex + dir, true);
@@ -629,8 +671,9 @@ function ensureSlideLoaded(index){
   function onKey(e){
     if(isHeroOpen()) return;
     if(locked) return;
-    if(e.key === 'ArrowDown' || e.key === 'PageDown'){ e.preventDefault(); snapTo(currentIndex + 1, true); }
-    if(e.key === 'ArrowUp' || e.key === 'PageUp'){ e.preventDefault(); snapTo(currentIndex - 1, true); }
+    // hide hint on keyboard nav
+    if(e.key === 'ArrowDown' || e.key === 'PageDown'){ hideSlideHint(); e.preventDefault(); snapTo(currentIndex + 1, true); }
+    if(e.key === 'ArrowUp'   || e.key === 'PageUp'){ hideSlideHint(); e.preventDefault(); snapTo(currentIndex - 1, true); }
   }
 
   // init
@@ -651,7 +694,7 @@ function ensureSlideLoaded(index){
     slidesWrap.style.willChange = 'transform';
     slidesWrap.style.backfaceVisibility = 'hidden';
     updateVH();
-    // ensure initial slides loaded
+    // ensure initial slide loaded
     ensureSlideLoaded(0);
   }
 
