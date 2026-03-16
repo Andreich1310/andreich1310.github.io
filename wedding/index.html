@@ -546,118 +546,92 @@ async function loadSVGSlides(){
 }
 
 function replaceGuestText(){
+
   const params = new URLSearchParams(window.location.search);
   let guestParam = params.get('guest');
+
   const guestMessage = document.getElementById('guestMessage');
   if(!guestMessage) return;
 
   if(!guestParam){
-    guestMessage.textContent = guestMessage.textContent || "Дорогие гости!";
+    guestMessage.textContent = "Дорогие гости!";
     return;
   }
 
   const guest = decodeURIComponent(guestParam.trim());
-  const isPlural = guest.includes(" и ") || guest.includes(",") || guest.includes("&");
-  const prefix = isPlural ? "Дорогие " : "Дорогой ";
-  guestMessage.textContent = prefix + guest + "!";
-  if(isPlural) return; // для нескольких гостей не меняем формы
+  guestMessage.textContent = guest + "!";
+
+  // проверяем форму
+  const isSingular = guest.toLowerCase().startsWith("дорогой");
+
+  if(!isSingular) return; // если "дорогие" — ничего не меняем
 
   const DICT = {
     "вы": "ты",
     "вас": "тебя",
     "были": "был"
   };
+
   const escapeRegExp = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
   const preserveCase = (match, replacement) => {
     if(match === match.toUpperCase()) return replacement.toUpperCase();
-    if(match[0] === match[0].toUpperCase()) return replacement[0].toUpperCase() + replacement.slice(1);
+    if(match[0] === match[0].toUpperCase()) {
+      return replacement[0].toUpperCase() + replacement.slice(1);
+    }
     return replacement;
   };
 
-  // находим нужный контейнер
-  const allSlides = Array.from(document.querySelectorAll('.svg-slide'));
-  let container = allSlides.find(el => {
-    const ds = el.getAttribute('data-src') || '';
-    return ds === 'slides/2.svg' || ds.endsWith('/2.svg') || ds.endsWith('2.svg');
+  const slides = Array.from(document.querySelectorAll('.svg-slide'));
+  let container = slides.find(el => {
+    const src = el.getAttribute('data-src') || '';
+    return src.endsWith('2.svg');
   });
-  if(!container && allSlides.length >= 2) container = allSlides[1];
-  if(!container){ console.warn('replaceGuestText: target svg-slide not found'); return; }
+
+  if(!container && slides.length >= 2) container = slides[1];
+  if(!container) return;
 
   const svg = container.querySelector('svg');
-  if(!svg){ console.warn('replaceGuestText: svg not in container yet'); return; }
+  if(!svg) return;
 
-  let totalReplacements = 0;
-  let totalAdjustments = 0;
-  const changedNodes = [];
+  const tspans = svg.querySelectorAll('tspan');
 
-  // 1) Обрабатываем ВСЕ <tspan> (без изменения родителей)
-  const tspans = Array.from(svg.querySelectorAll('tspan'));
   tspans.forEach(node => {
-    const orig = node.textContent;
-    let text = orig;
 
-    Object.entries(DICT).forEach(([from, to]) => {
-      const re = new RegExp('(^|[^\\p{L}])(' + escapeRegExp(from) + ')(?=[^\\p{L}]|$)', 'giu');
-      text = text.replace(re, (match, p1, p2) => {
-        totalReplacements++;
-        return (p1 || '') + preserveCase(p2, to);
+    const originalText = node.textContent;
+    let text = originalText;
+
+    Object.entries(DICT).forEach(([from,to])=>{
+      const re = new RegExp('(^|[^\\p{L}])('+escapeRegExp(from)+')(?=[^\\p{L}]|$)','giu');
+
+      text = text.replace(re,(match,p1,p2)=>{
+        return (p1 || '') + preserveCase(p2,to);
       });
     });
 
-    if(text !== orig){
-      // пытаемся сохранить ширину: замер до и после
-      let origLen = null, newLen = null;
-      try { if(typeof node.getComputedTextLength === 'function') origLen = node.getComputedTextLength(); } catch(e){}
+    if(text !== originalText){
+
+      let origLen = null;
+      let newLen = null;
+
+      try{ origLen = node.getComputedTextLength(); }catch(e){}
+
       node.textContent = text;
-      try { if(typeof node.getComputedTextLength === 'function') newLen = node.getComputedTextLength(); } catch(e){}
 
-      // добавляем hair-spaces, если стало короче
-      const TOL = 0.6;
-      let iter = 0;
-      while(newLen !== null && origLen !== null && newLen + TOL < origLen && iter < 12){
-        node.textContent = node.textContent + '\u200A';
-        iter++; totalAdjustments++;
-        try { newLen = node.getComputedTextLength(); } catch(e){ newLen = null; break; }
+      try{ newLen = node.getComputedTextLength(); }catch(e){}
+
+      let i = 0;
+
+      while(origLen && newLen && newLen < origLen - 0.6 && i < 12){
+        node.textContent += "\u200A";
+        i++;
+        newLen = node.getComputedTextLength();
       }
-
-      changedNodes.push({node, before: orig, after: node.textContent});
     }
+
   });
 
-  // 2) Обрабатываем <text>, у которых НЕТ вложенных <tspan> (без риска сломать структуру)
-  const textEls = Array.from(svg.querySelectorAll('text')).filter(t => t.querySelectorAll('tspan').length === 0);
-  textEls.forEach(node => {
-    const orig = node.textContent;
-    let text = orig;
-    Object.entries(DICT).forEach(([from, to]) => {
-      const re = new RegExp('(^|[^\\p{L}])(' + escapeRegExp(from) + ')(?=[^\\p{L}]|$)', 'giu');
-      text = text.replace(re, (match, p1, p2) => {
-        totalReplacements++;
-        return (p1 || '') + preserveCase(p2, to);
-      });
-    });
-
-    if(text !== orig){
-      let origLen = null, newLen = null;
-      try { if(typeof node.getComputedTextLength === 'function') origLen = node.getComputedTextLength(); } catch(e){}
-      node.textContent = text;
-      try { if(typeof node.getComputedTextLength === 'function') newLen = node.getComputedTextLength(); } catch(e){}
-
-      let iter = 0;
-      while(newLen !== null && origLen !== null && newLen + 0.6 < origLen && iter < 12){
-        node.textContent = node.textContent + '\u200A';
-        iter++; totalAdjustments++;
-        try { newLen = node.getComputedTextLength(); } catch(e){ newLen = null; break; }
-      }
-
-      changedNodes.push({node, before: orig, after: node.textContent});
-    }
-  });
-
-  console.info('replaceGuestText: replacements=', totalReplacements, 'adjustments=', totalAdjustments, 'changedNodesCount=', changedNodes.length);
-  // Для отладки можно раскомментировать и посмотреть первые изменения:
-  // console.log(changedNodes.slice(0,10).map(c => ({before: c.before, after: c.after})));
-    }
+}
   
 loadSVGSlides();
 
