@@ -586,44 +586,45 @@ function replaceGuestText(){
     return replacement;
   };
 
-  // ищем контейнер .svg-slide с data-src="slides/2.svg" (точное совпадение) или заканчивающийся на "/2.svg"
+  // находим контейнер по атрибуту data-src="slides/2.svg" (или заканчивающийся на 2.svg)
   const allSlides = Array.from(document.querySelectorAll('.svg-slide'));
   let container = allSlides.find(el => {
     const ds = el.getAttribute('data-src') || '';
     return ds === 'slides/2.svg' || ds.endsWith('/2.svg') || ds.endsWith('2.svg');
   });
+  if(!container && allSlides.length >= 2) container = allSlides[1];
+  if(!container) return;
 
-  // если не нашли — можно попробовать взять второй по порядку (на случай другой разметки)
-  if(!container && allSlides.length >= 2) {
-    container = allSlides[1];
-  }
-
-  if(!container) {
-    // ничего не делать — нет нужного контейнера
-    // console.warn('replaceGuestText: target svg-slide not found');
-    return;
-  }
-
-  // внутри контейнера ожидаем inline <svg> (loadSVGSlides() должен был вставить)
   const svg = container.querySelector('svg');
-  if(!svg) {
-    // console.warn('replaceGuestText: svg not in container yet');
-    return;
-  }
+  if(!svg) return;
 
-  // заменяем только внутри <tspan> (и <text>) — НИЧЕГО не объединяем, чтобы не ломать координаты
-  const nodes = svg.querySelectorAll('tspan, text');
-  Object.entries(DICT).forEach(([from, to])=>{
-    const re = new RegExp('\\b' + escapeRegExp(from) + '\\b', 'giu'); // глобально, регистронезависимо, unicode
-    nodes.forEach(node=>{
-      // заменяем глобально, с сохранением регистра
-      node.textContent = node.textContent.replace(re, m => preserveCase(m, to));
+  // --- REPLACEMENT: unicode-friendly word boundaries ---
+  // регулярка: (начало или не-буква) (слово) (?= не-буква или конец)
+  // флаги: g - глобально, i - регистронезависимо, u - unicode (нужен для \p{L} в других вариантах)
+  let totalReplacements = 0;
+
+  Object.entries(DICT).forEach(([from, to]) => {
+    // build regex that matches the word with unicode-aware boundaries
+    // capture preceding character (if any) to preserve it in replacement
+    const re = new RegExp('(^|[^\\p{L}])(' + escapeRegExp(from) + ')(?=[^\\p{L}]|$)', 'giu');
+
+    // перебираем все text/tspan внутри svg
+    svg.querySelectorAll('text, tspan').forEach(node => {
+      // callback получает (match, p1, p2, offset, string)
+      const newText = node.textContent.replace(re, (match, p1, p2) => {
+        // p1 — либо '' (если начало строки), либо символ-граница
+        const replaced = preserveCase(p2, to);
+        // считаем, сколько замен сделали (можем прибавить на основе длины)
+        totalReplacements++;
+        return (p1 || '') + replaced;
+      });
+      node.textContent = newText;
     });
   });
-  alert("ok");
-  // готово
-  }
 
+  alert('replaceGuestText: total replacements =', totalReplacements);
+  // alert('ok: ' + totalReplacements);
+}
 loadSVGSlides();
 
 </script>
