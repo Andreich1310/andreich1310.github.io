@@ -119,7 +119,9 @@ html,body{
   height: 100%;
   vertical-align: top;  /* часто помогает при inline SVG */
 }
-
+.slide svg g {
+  transform: translateY(-10px); /* подбираешь по визуальному смещению */
+}
 /* inline container for svg file */
 .svg-slide {
   width: 100%;
