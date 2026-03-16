@@ -569,6 +569,7 @@ function replaceGuestText(){
   // словарь
   const dict = {
     "вас": "тебя",
+    "вы": "ты",
     "были": "был"
   };
 
@@ -577,7 +578,7 @@ function replaceGuestText(){
   if(!slide) return;
 
   const tspans = slide.querySelectorAll("tspan");
-
+  alert(tspans.length);
   tspans.forEach(tspan => {
 
     let text = tspan.textContent;
