@@ -545,22 +545,16 @@ async function loadSVGSlides(){
   replaceGuestText();
 }
 
-// === заменяем guest text и применяем грамматику только к 2-му .svg-slide ===
 function replaceGuestText(){
+
   const params = new URLSearchParams(window.location.search);
-  let guestParam = params.get('guest');
-  const guestMessage = document.getElementById('guestMessage');
-  if(!guestMessage) return;
+  let guest = params.get("guest");
 
-  // если нет параметра — fallback и выходим
-  if(!guestParam){
-    guestMessage.textContent = guestMessage.textContent || "Дорогие гости!";
-    return;
-  }
+  const guestMessage = document.getElementById("guestMessage");
+  if(!guestMessage || !guest) return;
 
-  const guest = decodeURIComponent(guestParam.trim());
+  guest = decodeURIComponent(guest);
 
-  // простое правило множественного числа
   const isPlural =
     guest.includes(" и ") ||
     guest.includes(",") ||
@@ -569,90 +563,46 @@ function replaceGuestText(){
   const prefix = isPlural ? "Дорогие " : "Дорогой ";
   guestMessage.textContent = prefix + guest + "!";
 
-  // если множественное — больше ничего не меняем
+  // если гостей несколько — ничего не меняем
   if(isPlural) return;
 
-  // --- словарь замен (можно расширять) ---
-  const DICT = [
-    ['вы',   'ты'],
-    ['были', 'был']
-  ];
-
-  const escapeRegExp = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const makeRe = from => new RegExp('\\b' + escapeRegExp(from) + '\\b', 'iu');
-
-  // сохраняем регистр: ВЫ -> ТЫ, Вы -> Ты, вы -> ты
-  const preserveCase = (match, replacement) => {
-    if(match === match.toUpperCase()) return replacement.toUpperCase();
-    if(match[0] === match[0].toUpperCase()) return replacement[0].toUpperCase() + replacement.slice(1);
-    return replacement;
+  // словарь
+  const dict = {
+    "вас": "тебя",
+    "были": "был"
   };
 
-  // находим 2-й .svg-slide (индекс 1)
-  const slides = Array.from(document.querySelectorAll('.svg-slide'));
-  const container = slides[1]; // второй по порядку
-  if(!container) return;
+  // второй svg-slide
+  const slide = document.querySelectorAll(".svg-slide")[1];
+  if(!slide) return;
 
-  // внутри контейнера ищем inline <svg> (если SVG не встроен — ничего не делать)
-  const svg = container.querySelector('svg');
-  if(!svg) return;
+  const tspans = slide.querySelectorAll("tspan");
 
-  // 1) быстрая замена в существующих узлах <text> и <tspan>
-  const nodes = svg.querySelectorAll('text, tspan');
-  nodes.forEach(node => {
-    let s = node.textContent;
-    DICT.forEach(([from, to]) => {
-      const re = makeRe(from);
-      // заменяем все вхождения по одному (без флага g — чтобы корректно работать с preserveCase)
-      while(re.test(s)){
-        s = s.replace(re, m => preserveCase(m, to));
-      }
-    });
-    node.textContent = s;
-  });
+  tspans.forEach(tspan => {
 
-  // 2) фоллбек: если слово всё ещё где-то осталось (возможно разбито между несколькими <tspan>),
-  // объединяем содержимое конкретного <text> в один <tspan> и делаем замену — только внутри этого слайда.
-  const textEls = svg.querySelectorAll('text');
-  textEls.forEach(textEl => {
-    const full = textEl.textContent;
-    let need = false;
-    for(const [from] of DICT){
-      if(makeRe(from).test(full)){ need = true; break; }
-    }
-    if(!need) return;
+    let text = tspan.textContent;
 
-    let newText = full;
-    DICT.forEach(([from, to])=>{
-      const re = makeRe(from);
-      while(re.test(newText)){
-        newText = newText.replace(re, m => preserveCase(m, to));
-      }
+    Object.entries(dict).forEach(([from,to]) => {
+
+      const re = new RegExp(`\\b${from}\\b`, "gi");
+
+      text = text.replace(re, match => {
+
+        if(match === match.toUpperCase()) return to.toUpperCase();
+        if(match[0] === match[0].toUpperCase())
+          return to.charAt(0).toUpperCase() + to.slice(1);
+
+        return to;
+
+      });
+
     });
 
-    // заменяем всех потомков одним <tspan>, пытаясь сохранить координаты первого tspan
-    const firstTspan = textEl.querySelector('tspan');
-    while(textEl.firstChild) textEl.removeChild(textEl.firstChild);
-    const ns = "http://www.w3.org/2000/svg";
-    const t = document.createElementNS(ns, 'tspan');
-    t.textContent = newText;
-    if(firstTspan){
-      ['x','y','dx','dy','text-anchor'].forEach(attr=>{
-        if(firstTspan.hasAttribute(attr)) t.setAttribute(attr, firstTspan.getAttribute(attr));
-      });
-    } else {
-      ['x','y','dx','dy','text-anchor'].forEach(attr=>{
-        if(textEl.hasAttribute(attr)) t.setAttribute(attr, textEl.getAttribute(attr));
-      });
-    }
-    textEl.appendChild(t);
+    tspan.textContent = text;
+
   });
 
-  // готово
-}
-
-// ВЫЗОВ (в конце loadSVGSlides()):
-// loadSVGSlides().then(()=> replaceGuestText());
+    }
 
 loadSVGSlides();
 
