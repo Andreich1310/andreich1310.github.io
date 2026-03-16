@@ -324,6 +324,9 @@ async function fetchAndInsertSVG(container){
     const txt = await res.text();
     container.innerHTML = txt;
     container.dataset.__loaded = '1';
+    // Принудительно ставим выравнивание сверху-лево
+const svg = container.querySelector('svg');
+if(svg) svg.setAttribute('preserveAspectRatio', 'xMinYMin meet');
   }catch(err){
     console.warn('SVG load failed', url, err);
   }
