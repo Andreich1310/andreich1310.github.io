@@ -562,7 +562,7 @@ function replaceGuestText(){
   guestMessage.textContent = guest + "!";
 
   // проверяем форму
-  const isSingular = guest.toLowerCase().startsWith("дорогой");
+  const isSingular = guest.toLowerCase().startsWith("дорогой") || guest.toLowerCase().startsWith("дорогая");
 
   if(!isSingular) return; // если "дорогие" — ничего не меняем
 
