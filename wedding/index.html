@@ -557,61 +557,45 @@ function replaceGuestText(){
   }
 
   const guest = decodeURIComponent(guestParam.trim());
-
-  const isPlural =
-    guest.includes(" и ") ||
-    guest.includes(",") ||
-    guest.includes("&");
-
+  const isPlural = guest.includes(" и ") || guest.includes(",") || guest.includes("&");
   const prefix = isPlural ? "Дорогие " : "Дорогой ";
   guestMessage.textContent = prefix + guest + "!";
-
   if(isPlural) return; // для нескольких гостей не меняем формы
 
-  // словарь замен — добавляй пары сюда
   const DICT = {
     "вы": "ты",
     "вас": "тебя",
     "были": "был"
   };
-
   const escapeRegExp = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
   const preserveCase = (match, replacement) => {
     if(match === match.toUpperCase()) return replacement.toUpperCase();
     if(match[0] === match[0].toUpperCase()) return replacement[0].toUpperCase() + replacement.slice(1);
     return replacement;
   };
 
-  // найти контейнер по data-src="slides/2.svg" (или заканчивающемуся на "2.svg")
+  // находим нужный контейнер
   const allSlides = Array.from(document.querySelectorAll('.svg-slide'));
   let container = allSlides.find(el => {
     const ds = el.getAttribute('data-src') || '';
     return ds === 'slides/2.svg' || ds.endsWith('/2.svg') || ds.endsWith('2.svg');
   });
   if(!container && allSlides.length >= 2) container = allSlides[1];
-  if(!container) { console.warn('replaceGuestText: target svg-slide not found'); return; }
+  if(!container){ console.warn('replaceGuestText: target svg-slide not found'); return; }
 
   const svg = container.querySelector('svg');
-  if(!svg) { console.warn('replaceGuestText: svg not in container yet'); return; }
+  if(!svg){ console.warn('replaceGuestText: svg not in container yet'); return; }
 
   let totalReplacements = 0;
   let totalAdjustments = 0;
+  const changedNodes = [];
 
-  // пройдёмся по каждому <tspan> и <text> внутри нужного svg
-  const nodes = Array.from(svg.querySelectorAll('tspan, text'));
+  // 1) Обрабатываем ВСЕ <tspan> (без изменения родителей)
+  const tspans = Array.from(svg.querySelectorAll('tspan'));
+  tspans.forEach(node => {
+    const orig = node.textContent;
+    let text = orig;
 
-  nodes.forEach(node => {
-    // сохраним исходную длину (если доступна)
-    let origLen = null;
-    try {
-      if(typeof node.getComputedTextLength === 'function') origLen = node.getComputedTextLength();
-    } catch(e) { origLen = null; }
-
-    let text = node.textContent;
-
-    // для каждой пары слов делаем unicode-aware замену (без \b, т.к. он нестабилен для кириллицы)
-    // используем границы через \p{L} (нужен флаг u)
     Object.entries(DICT).forEach(([from, to]) => {
       const re = new RegExp('(^|[^\\p{L}])(' + escapeRegExp(from) + ')(?=[^\\p{L}]|$)', 'giu');
       text = text.replace(re, (match, p1, p2) => {
@@ -620,30 +604,60 @@ function replaceGuestText(){
       });
     });
 
-    // если текст изменился — записываем и при необходимости корректируем ширину
-    if(text !== node.textContent){
+    if(text !== orig){
+      // пытаемся сохранить ширину: замер до и после
+      let origLen = null, newLen = null;
+      try { if(typeof node.getComputedTextLength === 'function') origLen = node.getComputedTextLength(); } catch(e){}
       node.textContent = text;
+      try { if(typeof node.getComputedTextLength === 'function') newLen = node.getComputedTextLength(); } catch(e){}
 
-      // попробуем корректировать длину добавлением тонких пробелов, если текст стал короче
-      if(origLen !== null && typeof node.getComputedTextLength === 'function'){
-        let newLen;
-        try { newLen = node.getComputedTextLength(); } catch(e){ newLen = null; }
-        // небольшая допустимая погрешность в пикселях
-        const TOL = 0.6;
-        let iter = 0;
-        // не больше 12 добавлений, чтобы не наращивать слишком много знаков
-        while(newLen !== null && newLen + TOL < origLen && iter < 12){
-          node.textContent = node.textContent + '\u200A'; // hair space
-          iter++;
-          totalAdjustments++;
-          try { newLen = node.getComputedTextLength(); } catch(e){ newLen = null; break; }
-        }
+      // добавляем hair-spaces, если стало короче
+      const TOL = 0.6;
+      let iter = 0;
+      while(newLen !== null && origLen !== null && newLen + TOL < origLen && iter < 12){
+        node.textContent = node.textContent + '\u200A';
+        iter++; totalAdjustments++;
+        try { newLen = node.getComputedTextLength(); } catch(e){ newLen = null; break; }
       }
+
+      changedNodes.push({node, before: orig, after: node.textContent});
     }
   });
 
-  console.info('replaceGuestText: replacements=', totalReplacements, 'adjustments(hair-spaces)=', totalAdjustments);
-}
+  // 2) Обрабатываем <text>, у которых НЕТ вложенных <tspan> (без риска сломать структуру)
+  const textEls = Array.from(svg.querySelectorAll('text')).filter(t => t.querySelectorAll('tspan').length === 0);
+  textEls.forEach(node => {
+    const orig = node.textContent;
+    let text = orig;
+    Object.entries(DICT).forEach(([from, to]) => {
+      const re = new RegExp('(^|[^\\p{L}])(' + escapeRegExp(from) + ')(?=[^\\p{L}]|$)', 'giu');
+      text = text.replace(re, (match, p1, p2) => {
+        totalReplacements++;
+        return (p1 || '') + preserveCase(p2, to);
+      });
+    });
+
+    if(text !== orig){
+      let origLen = null, newLen = null;
+      try { if(typeof node.getComputedTextLength === 'function') origLen = node.getComputedTextLength(); } catch(e){}
+      node.textContent = text;
+      try { if(typeof node.getComputedTextLength === 'function') newLen = node.getComputedTextLength(); } catch(e){}
+
+      let iter = 0;
+      while(newLen !== null && origLen !== null && newLen + 0.6 < origLen && iter < 12){
+        node.textContent = node.textContent + '\u200A';
+        iter++; totalAdjustments++;
+        try { newLen = node.getComputedTextLength(); } catch(e){ newLen = null; break; }
+      }
+
+      changedNodes.push({node, before: orig, after: node.textContent});
+    }
+  });
+
+  console.info('replaceGuestText: replacements=', totalReplacements, 'adjustments=', totalAdjustments, 'changedNodesCount=', changedNodes.length);
+  // Для отладки можно раскомментировать и посмотреть первые изменения:
+  // console.log(changedNodes.slice(0,10).map(c => ({before: c.before, after: c.after})));
+    }
   
 loadSVGSlides();
 
