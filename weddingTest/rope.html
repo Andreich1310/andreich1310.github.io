@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<style>
+html,body{
+  margin:0;
+  height:100%;
+  overflow:hidden;
+  background:#f3e6d3;
+  touch-action:none;
+}
+canvas{
+  display:block;
+  width:100vw;
+  height:100vh;
+}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+const canvas=document.getElementById("c")
+const ctx=canvas.getContext("2d")
+
+function resize(){ canvas.width=innerWidth; canvas.height=innerHeight }
+resize()
+addEventListener("resize",resize)
+
+const segments=5
+const totalLength=360
+const spacing=totalLength/segments
+
+const fixedAngle = 50*Math.PI/180
+const minAngle = 160*Math.PI/180
+
+let points=[]
+let sticks=[]
+let angularStiffness = 0.15 // пружина углов
+
+class Point{
+  constructor(x,y,pinned=false){
+    this.x=x; this.y=y
+    this.oldx=x; this.oldy=y
+    this.pinned=pinned
+  }
+}
+
+class Stick{
+  constructor(a,b){
+    this.p0=a; this.p1=b
+    this.length=Math.hypot(a.x-b.x,a.y-b.y)
+  }
+}
+
+let anchorX = innerWidth/2
+let anchorY = 120
+
+function build(){
+  points=[]
+  sticks=[]
+  for(let i=0;i<=segments;i++){
+    let x=anchorX + Math.cos(fixedAngle)*spacing*i
+    let y=anchorY + Math.sin(fixedAngle)*spacing*i
+    const p=new Point(x,y,i===0)
+    points.push(p)
+    if(i>0) sticks.push(new Stick(points[i-1],p))
+  }
+}
+build()
+
+const gravity=0.7
+let sway=0
+let targetSway=0
+
+function motion(e){
+  const ax=e.accelerationIncludingGravity?.x||0
+  targetSway=-ax*0.03
+}
+window.addEventListener("devicemotion",motion)
+
+/* drag */
+let drag=false, fingerX=0, fingerY=0, THRESH=70
+canvas.addEventListener("pointerdown", e=>{
+  const end=points.at(-1)
+  if(Math.hypot(end.x-e.clientX,end.y-e.clientY)<THRESH){
+    drag=true; fingerX=e.clientX; fingerY=e.clientY
+  }
+})
+canvas.addEventListener("pointermove", e=>{
+  if(drag){ fingerX=e.clientX; fingerY=e.clientY }
+})
+canvas.addEventListener("pointerup",()=>drag=false)
+canvas.addEventListener("pointercancel",()=>drag=false)
+
+/* физика */
+function solveSticks(){
+  for(const s of sticks){
+    let dx=s.p1.x-s.p0.x, dy=s.p1.y-s.p0.y
+    let dist=Math.hypot(dx,dy)
+    let diff=(dist-s.length)/dist
+    let offx=dx*0.5*diff, offy=dy*0.5*diff
+    if(!s.p0.pinned){ s.p0.x+=offx; s.p0.y+=offy } else { s.p0.x=anchorX; s.p0.y=anchorY }
+    if(!s.p1.pinned){ s.p1.x-=offx; s.p1.y-=offy }
+  }
+}
+
+/* угловая пружина */
+function solveAngles(){
+  for(let i=1;i<points.length-1;i++){
+    const A=points[i-1], B=points[i], C=points[i+1]
+    let v1x=A.x-B.x, v1y=A.y-B.y
+    let v2x=C.x-B.x, v2y=C.y-B.y
+    let l1=Math.hypot(v1x,v1y), l2=Math.hypot(v2x,v2y)
+    if(l1===0||l2===0) continue
+    let dot=(v1x*v2x+v1y*v2y)/(l1*l2)
+    dot=Math.max(-1,Math.min(1,dot))
+    let angle=Math.acos(dot)
+    let torque = (angle - minAngle)*angularStiffness
+    // вращаем точки вокруг B
+    const ax = (v1y/l1 - v2y/l2)*torque
+    const ay = (v2x/l2 - v1x/l1)*torque
+    if(!A.pinned){ A.x+=ax; A.y+=ay }
+    if(!C.pinned){ C.x+=ax; C.y+=ay }
+  }
+}
+
+/* фикс первого сегмента */
+function lockFirstSegment(){
+  const p0=points[0], p1=points[1]
+  p1.x=p0.x + Math.cos(fixedAngle)*spacing
+  p1.y=p0.y + Math.sin(fixedAngle)*spacing
+}
+
+function physics(){
+  sway+=(targetSway-sway)*0.12
+  for(let i=0;i<points.length;i++){
+    const p=points[i]
+    if(p.pinned) continue
+    let vx=(p.x-p.oldx)*0.995
+    let vy=(p.y-p.oldy)*0.995
+    p.oldx=p.x; p.oldy=p.y
+    p.x+=vx; p.y+=vy+gravity
+    const w=i/(points.length-1)
+    p.x+=sway*(0.5+w*0.1)
+  }
+
+  if(drag){
+    const end=points.at(-1)
+    end.x+=(fingerX-end.x)*0.35
+    end.y+=(fingerY-end.y)*0.35
+  }
+
+  for(let k=0;k<12;k++){
+    solveSticks()
+    solveAngles()
+  }
+
+  lockFirstSegment()
+}
+
+/* отрисовка */
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height)
+  ctx.lineWidth=26
+  ctx.strokeStyle="#c62828"
+  ctx.beginPath()
+  ctx.moveTo(points[0].x, points[0].y)
+  for(let i=1;i<points.length;i++){
+    ctx.lineTo(points[i].x, points[i].y)
+  }
+  ctx.stroke()
+}
+
+/* loop */
+function loop(){
+  physics()
+  draw()
+  requestAnimationFrame(loop)
+}
+
+loop()
+</script>
+</body>
+</html>
