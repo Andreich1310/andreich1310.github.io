@@ -767,7 +767,9 @@ function replaceGuestText(){
     "были": "была"
   };
 
-  
+  if(g.startsWith('дорогой')){
+  DICT["были"] = "был";
+  }
   
   const escapeRegExp = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const preserveCase = (match, replacement) => {
